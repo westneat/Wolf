@@ -114,7 +114,10 @@ class Player:
         self.current_thread = tc.Thread()
         self.voting_power = 1
         self.is_killer = False
+        self.reviving = False
         self.noun = ''
+        self.gamenum = 0
+        self.votes = 1
         # Most Solos
         self.solo_kill_attempt = []
         # Werewolves
@@ -272,7 +275,7 @@ class Conjuror(Player):
         self.noun = noun
         self.aura = 'Unknown'
         self.role = 'Conjuror'
-        self.new_role = 0
+        self.new_role = self
         self.category = 'Strong Villager'
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the day by posting [b]here[/b]:
@@ -286,7 +289,7 @@ class Conjuror(Player):
                 self.current_thread.thread_id != self.last_thread_id and victims[0].conjuror_can_take
                 and self.current_thread.open):
             self.last_thread_id = self.current_thread.thread_id
-            self.new_role = victims[0].gamenum
+            self.new_role = victims[0]
             self.chat.write_message(f"You have successfully taken {victims[0].screenname}'s role.")
         return []
 
@@ -395,8 +398,7 @@ class Jailer(Player):
         if (keyword == 'shoot' and len(victims) == 1 and self.mp == 100 and victims[0].alive and victims[0].jailed
                 and victims[0].gamenum != self.gamenum and not self.current_thread.open):
             self.mp = self.mp - 100
-        #    victims[0].alive = False
-            return ['jail', self, victims[0]]  # kill_player('jail', victims[0])
+            return ['jail', self, victims[0]]
         return []
 
 
@@ -426,7 +428,7 @@ class Medium(Player):
         if (keyword == 'revive' and len(victims) == 1 and not victims[0].alive
                 and self.mp == 100 and victims[0].gamenum != self.gamenum and not self.current_thread.open):
             self.mp = self.mp - 100
-            # victims[0].alive = True #handled in game - BW
+            victims[0].reviving = True
         return []
 
 
@@ -555,12 +557,12 @@ class Avenger(Player):
     def immediate_action(self, keyword, victims):
         if keyword == 'tag' and len(victims) == 1 and victims[0].alive and victims[0].gamenum != self.gamenum:
             self.chat.write_message(f"You are currently avenging upon {victims[0].screenname}.")
-            self.avenging = victims[0].gamenum
+            self.avenging = victims[0]
         return []
 
     def phased_action(self, keyword, victims):
         if keyword == 'tag' and len(victims) == 1 and victims[0].alive and victims[0].gamenum != self.gamenum:
-            self.avenging = victims[0].gamenum
+            self.avenging = victims[0]
         return []
 
 
@@ -568,7 +570,6 @@ class BeastHunter(Player):
     def __init__(self, gamenum=0, screenname='', noun=''):
         super().__init__()
         self.role = 'Beast Hunter'
-        self.protecting = []
         self.screenname = screenname
         self.gamenum = gamenum
         self.noun = noun
@@ -581,7 +582,7 @@ class BeastHunter(Player):
         
     def immediate_action(self, keyword, victims):
         if (keyword == 'trap' and len(victims) == 1 and victims[0].alive
-                and not self.current_thread.open and victims[0].gamenum not in self.protecting):
+                and not self.current_thread.open and victims[0].gamenum != self.trap_on):
             self.chat.write_message(f"Tonight you will move your trap to {victims[0].screenname}.")
         return []
 
@@ -610,7 +611,7 @@ class BellRinger(Player):
     def immediate_action(self, keyword, victims):
         if (keyword == 'watch' and len(victims) == 2 and are_all_alive(victims)
                 and victims[0].gamenum != self.gamenum and victims[1].gamenum != self.gamenum
-                and victims[0].gamenum != victims[1].gamenum):
+                and victims[0].gamenum != victims[1].gamenum and self.mp == 100):
             self.chat.write_message(f"You will watch {victims[0].screenname} and "
                                     f"{victims[1].screenname} until the next night phase.")
         return []
@@ -618,10 +619,10 @@ class BellRinger(Player):
     def phased_action(self, keyword, victims):
         if (keyword == 'watch' and len(victims) == 2 and are_all_alive(victims)
                 and victims[0].gamenum != self.gamenum and victims[1].gamenum != self.gamenum
-                and victims[0].gamenum != victims[1].gamenum):
-            victims[0].bell_ringer_watched_by.append(self.gamenum)
-            victims[1].bell_ringer_watched_by.append(self.gamenum)
-            self.bell_ringer_pair = [victims[0].gamenum, victims[1].gamenum]
+                and victims[0].gamenum != victims[1].gamenum and self.mp == 100):
+            victims[0].bell_ringer_watched_by.append(self)
+            victims[1].bell_ringer_watched_by.append(self)
+            self.bell_ringer_pair = [victims[0], victims[1]]
         return []
 
 
@@ -766,7 +767,7 @@ class FlowerChild(Player):
         self.screenname = screenname
         self.gamenum = gamenum
         self.noun = noun
-        self.saved_lynch = 0
+        self.saved_lynch = Player()
         self.hhtargetable = False
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the day by posting [b]here[/b]:
@@ -779,7 +780,7 @@ class FlowerChild(Player):
             text = f"You are currently saving {victims[0]} from being lynched."
             self.chat.write_message(text)
             victims[0].lynchable = False
-            self.saved_lynch = victims[0].gamenum
+            self.saved_lynch = victims[0]
         return []
 
 
@@ -795,6 +796,7 @@ class Forger(Player):
         self.forging_gun = False
         self.forging_shield = False
         self.aura = 'Unknown'
+        self.action_used = 0
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
@@ -812,6 +814,7 @@ class Forger(Player):
         You can forge a new item after arming someone in the same night. Do so in a separate post.'''
 
     def immediate_action(self, keyword, victims):
+        self.action_used = 0
         if keyword == 'weapon' and self.guns_forged == 0 and not self.current_thread.open:
             text = f"You will begin forging the gun."
             self.chat.write_message(text)
@@ -829,19 +832,21 @@ class Forger(Player):
         return []
 
     def phased_action(self, keyword, victims):
+        self.action_used = self.action_used + 1
         if (keyword == 'weapon' and self.guns_forged == 0 and self.gamenum not in self.forger_guns
-                and not self.current_thread.open):
+                and not self.current_thread.open and self.action_used == 2):
             self.guns_forged = self.guns_forged + 1
             self.forging_gun = True
             self.chat.write_message("You have successfully finished forging a gun.")
         if (keyword == 'shield' and self.shields_forged <= 1 and self.gamenum not in self.forger_shields
-                and not self.current_thread.open):
+                and not self.current_thread.open and self.action_used == 2):
             self.shields_forged = self.shields_forged + 1
             self.forging_shield = True
             self.chat.write_message("You have successfully finished forging a shield.")
             # We have a gun, giftee is alive, one giftee, we haven't given them a gun before
         if (keyword == 'arm' and self.gamenum in self.forger_guns and victims[0].alive and len(victims) == 1
-                and self.gamenum not in victims[0].forger_guns) and not self.current_thread.open:
+                and self.gamenum not in victims[0].forger_guns and self.action_used == 1
+                and not self.current_thread.open):
             # self.forging_gun = False move to daytime actions
             # more guns to shoot
             victims[0].has_forger_gun = victims[0].has_forger_gun + 1
@@ -853,7 +858,8 @@ class Forger(Player):
             self.chat.write_message(text)
             # We have a shield, giftee is alive, one giftee, we haven't given them a shield before
         if (keyword == 'arm' and self.gamenum in self.forger_shields and victims[0].alive and len(victims) == 1
-                and self.gamenum not in victims[0].forger_shields) and not self.current_thread.open:
+                and self.gamenum not in victims[0].forger_shields
+                and not self.current_thread.open and self.action_used == 1):
             # self.forging_shield = False move to daytime actions
             # more guns to shoot
             victims[0].has_forger_shield = victims[0].has_forger_shield + 1
@@ -1215,16 +1221,20 @@ class Violinist(Player):
 
     def immediate_action(self, keyword, victims):
         if (keyword == 'check' and len(victims) == 2 and victims[0].alive
-                and victims[0].gamenum != self.gamenum and not self.current_thread.open):
+                and victims[0].gamenum != self.gamenum and not self.current_thread.open
+                and victims[1].screenname != ''):
             self.chat.write_message(f"You will check {victims[0].screenname} against {victims[1].screenname} tonight")
+        elif keyword == 'check' and victims[1].screenname == '':
+            self.chat.write_message(f"Nobody has died since last night to compare with.")
         return []
 
     def phased_action(self, keyword, victims):
-        # Only works if they are targeting two people, haven't checked yet,
+        # Only works if they are targeting one person, haven't checked yet,
         # people are alive, and they aren't checking themselves
         if (keyword == 'check' and len(victims) == 2 and victims[0].alive
-                and victims[0].gamenum != self.gamenum and not self.current_thread.open):
-            if victims[0].apparent_team == victims[1].apparent_team:
+                and victims[0].gamenum != self.gamenum and not self.current_thread.open
+                and victims[1].screenname != ''):
+            if victims[0].apparent_team == victims[1].team:
                 self.chat.write_message(
                     f"{victims[0].screenname} appears to be mourning the death of {victims[1].screenname}. "
                     f"They are on the [b]same team[/b].")
@@ -1233,6 +1243,8 @@ class Violinist(Player):
                     f"{victims[0].screenname} is not mourning the death of {victims[1].screenname}. "
                     f"They are on [b]different teams[/b].")
             victims[0].seen_by.append(self.gamenum)
+        elif keyword == 'check' and victims[1].screenname == '':
+            self.chat.write_message(f"Nobody has died, so no info tonight.")
         return []
 
 
@@ -1306,12 +1318,12 @@ class WolfAvenger(Player):
     def immediate_action(self, keyword, victims):
         if keyword == 'tag' and len(victims) == 1 and victims[0].alive and victims[0].wolf_targetable:
             self.chat.write_message(f"You are currently avenging upon {victims[0].screenname}.")
-            self.avenging = victims[0].gamenum
+            self.avenging = victims[0]
         return []
 
     def phased_action(self, keyword, victims):
         if keyword == 'tag' and len(victims) == 1 and victims[0].alive and victims[0].wolf_targetable:
-            self.avenging = victims[0].gamenum
+            self.avenging = victims[0]
         return []
 
 
@@ -1505,7 +1517,7 @@ class GuardianWolf(Player):
         self.is_killer = True
         self.gamenum = gamenum
         self.noun = noun
-        self.saved_lynch = 0
+        self.saved_lynch = Player()
         self.wolf_targetable = False
         self.conjuror_can_take = False
         self.team = 'Wolf'
@@ -1523,7 +1535,7 @@ class GuardianWolf(Player):
                 and victims[0].alive and self.current_thread.open):
             text = f"You are currently saving {victims[0]} from being lynched."
             victims[0].lynchable = False
-            self.saved_lynch = victims[0].gamenum
+            self.saved_lynch = victims[0]
             self.chat.write_message(text)
         return []
 
@@ -1677,7 +1689,7 @@ class JellyWolf(Player):
     def phased_action(self, keyword, victims):
         if (keyword == 'protect' and self.mp == 100 and len(victims) == 1
                 and victims[0].alive and not self.current_thread.open):
-            victims[0].jellied_by.append(self.gamenum)
+            victims[0].jellied_by.append(self)
             self.jellying = victims[0].gamenum
             self.chat.write_message(f"You placed protective jelly on {victims[0]} last night.")
         return []
@@ -2095,6 +2107,7 @@ class Arsonist(Player):
         Wolfbot kill all'''
 
     def immediate_action(self, keyword, victims):
+        self.action_used = False
         if keyword == 'kill':
             self.chat.write_message(f"You are choosing to burn tonight.")
         if (keyword == 'douse' and len(victims) == 2 and self.gamenum != victims[0].gamenum
@@ -2253,16 +2266,12 @@ class EvilDetective(Player):
             if victims[0].gamenum == self.gamenum:
                 self.chat.write_message(f"{victims[0].screenname} and "
                                         f"{victims[1].screenname} are on [b]different teams[/b].")
-                victims[1].solo_kill_attempt.append('Evil Detective')
                 return ['detective', self, victims[0]]
             elif victims[1].gamenum == self.gamenum:
-                victims[0].solo_kill_attempt.append('Evil Detective')
                 self.chat.write_message(f"{victims[0].screenname} and "
                                         f"{victims[1].screenname} are on [b]different teams[/b].")
                 return ['detective', self, victims[1]]
             elif victims[1].team != victims[0].team:
-                victims[1].solo_kill_attempt.append('Evil Detective')
-                victims[0].solo_kill_attempt.append('Evil Detective')
                 self.chat.write_message(f"{victims[0].screenname} and "
                                         f"{victims[1].screenname} are on [b]different teams[/b].")
                 return ['detective', self, [victims[0], victims[1]]]
@@ -2413,9 +2422,9 @@ class SerialKiller(Player):
         deaths = []
         if keyword == 'kill' and len(victims) <= self.mp // 100:
             for player in victims:
-                if player.alive:
-                    if player.gamenum != self.gamenum:
-                        self.mp = self.mp - 100
-                        deaths.append(player)
+                if player.alive and player.gamenum != self.gamenum:
+                    self.mp = self.mp - 100
+                    deaths.append(player)
+                    self.has_killed = True
             return ['stabbed', self, deaths]
         return []
