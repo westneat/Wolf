@@ -75,10 +75,12 @@ class Game:
         self.jailer = 0
         self.day_open_tm = datetime.datetime.now()
         self.day_close_tm = datetime.datetime.now()
+        self.alch_deaths_tm = datetime.datetime.now()
         self.first_death = role.Player()
         self.couple = []
         self.cupid = role.Player()
         self.instigator = role.Player()
+        self.confusion_in_effect = False
 
     # These methods are necessary as different identifiers are used for different purposes,
     # and we need to be able to go between them easily
@@ -553,6 +555,8 @@ Winning Conditions:
         disguised_by = old_role.disguised_by
         coupled = old_role.coupled
         concussed = old_role.concussed
+        first_seer = old_role.first_seer
+        seer_apprentice = old_role.seer_apprentice
         has_been_concussed = old_role.has_been_concussed
         nightmared = old_role.nightmared
         tricked_by = old_role.tricked_by
@@ -577,6 +581,7 @@ Winning Conditions:
         red_potion = old_role.red_potion
         black_potion = old_role.black_potion
         spelled = old_role.spelled
+        scribed_by = old_role.scribed_by
         trapped_by = old_role.trapped_by
         shadow = old_role.shadow
         shamaned_by = old_role.shamaned_by
@@ -591,6 +596,10 @@ Winning Conditions:
         voting_power = old_role.voting_power
         noun = old_role.noun
         self.role_dictionary[old_role.gamenum] = new_role
+        for player in self.role_dictionary:
+            for i, actings in enumerate(self.role_dictionary[player].acting_upon):
+                if actings == old_role:
+                    self.role_dictionary[player].acting_upon[i] = new_role
         new_role.noun = noun
         new_role.gamenum = gamenum
         new_role.alive = True
@@ -610,6 +619,7 @@ Winning Conditions:
         new_role.hhtarget = hhtarget
         new_role.corrupted_by = corrupted_by
         new_role.cult = cult
+        new_role.scribed_by = scribed_by
         new_role.infected_by = infected_by
         new_role.seen_by = seen_by
         new_role.instigated = instigated
@@ -625,6 +635,8 @@ Winning Conditions:
         new_role.forger_shields = forger_shields
         new_role.red_potion = red_potion
         new_role.black_potion = black_potion
+        new_role.first_seer = first_seer
+        new_role.seer_apprentice = seer_apprentice
         new_role.spelled = spelled
         new_role.trapped_by = trapped_by
         new_role.shadow = shadow
@@ -640,139 +652,35 @@ Winning Conditions:
         new_role.voting_power = voting_power
         new_role.conjuror = conjuror
 
-    def start_night(self, night_number):
-        self.first_death = role.Player()
-        self.day_thread.create_thread(f"{self.game_title} Day {night_number}", self.day_post())
-        self.day_thread.lock_thread()
-        self.day_thread.stick_thread()
+    def create_wolf_chat(self, night_number):
+        wolves_id = []  # holds member ids
+        wolf_message = "This is wolf chat." + '\n' + '\n'
+        sorc_flag = False
+        shadow_flag = False
+        for player in self.role_dictionary:
+            if self.role_dictionary[player].team == 'Wolf' and self.role_dictionary[player].category != 'Wildcard':
+                wolves_id.append(self.gamenum_to_memberid(self.role_dictionary[player].gamenum))
+                if self.role_dictionary[player].role == 'Shadow Wolf':
+                    shadow_flag = True
+                if self.role_dictionary[player].role == 'Sorcerer':
+                    sorc_flag = True
+                wolf_message = wolf_message + (f'The word for[b] {self.role_dictionary[player].screenname} [/b]'
+                                               f'is [b] {self.role_dictionary[player].noun}[/b]. They are the '
+                                               f'[b]{self.role_dictionary[player].role}.[/b]') + '\n' + '\n'
+        if sorc_flag:
+            wolf_message = wolf_message + ("The Sorcerer may read this chat, but [b]may not[/b] participate "
+                                           "by either commenting or reacting unless they resign.") + '\n' + '\n'
+        if shadow_flag:
+            wolf_message = wolf_message + ("Wolf Chat will be [b]Closed[/b] at the start of the day due "
+                                           "to the Shadow Wolf.") + '\n' + '\n'
         if night_number == 1:
-            # get noun list
-            # Set up dead forum with Mark
-            self.mark_pm.create_conversation("New Wolf game", r'''Hi Mark,
-            
-            Could you please reset the dead forum for another game?''', [3])
-            # Set up Wolf Chat
-            wolves_id = []  # holds member ids
-            wolf_message = "This is wolf chat." + '\n' + '\n'
-            sorc_flag = False
-            shadow_flag = False
-            instigators = []  # holds member ids
-            for player in self.role_dictionary:
-                if self.role_dictionary[player].team == 'Wolf' and self.role_dictionary[player].category != 'Wildcard':
-                    wolves_id.append(self.gamenum_to_memberid(self.role_dictionary[player].gamenum))
-                    if self.role_dictionary[player].role == 'Shadow Wolf':
-                        shadow_flag = True
-                    if self.role_dictionary[player].role == 'Sorcerer':
-                        sorc_flag = True
-                    wolf_message = wolf_message + (f'The word for[b] {self.role_dictionary[player].screenname} [/b]'
-                                                   f'is [b] {self.role_dictionary[player].noun}[/b]. They are the '
-                                                   f'[b]{self.role_dictionary[player].role}.[/b]') + '\n' + '\n'
-                if self.role_dictionary[player].role == 'Instigator':
-                    instigators.append(self.gamenum_to_memberid(self.role_dictionary[player].gamenum))
-                    self.instigator = self.role_dictionary[player]
-            if sorc_flag:
-                wolf_message = wolf_message + ("The Sorcerer may read this chat, but [b]may not[/b] participate "
-                                               "by either commenting or reacting.") + '\n' + '\n'
-            if shadow_flag:
-                wolf_message = wolf_message + ("Wolf Chat will be [b]Closed[/b] at the start of the day due "
-                                               "to the Shadow Wolf.") + '\n' + '\n'
             wolf_message = wolf_message + ("For night 1 only, you must choose to act against this list of potential "
                                            "targets: ") + '\n' + self.get_randomized_nouns()
-            self.wolf_chat.create_conversation(f"{self.game_title} Wolf Chat", wolf_message, wolves_id)
-            # Set up Instigator Chat
-            if len(instigators) > 0:
-                insti_text = ''
-                for player in self.role_dictionary:
-                    if self.role_dictionary[player].instigated:
-                        instigators.append(self.gamenum_to_memberid(self.role_dictionary[player].gamenum))
-                        insti_text = insti_text + (f'The word for [b]{self.role_dictionary[player].screenname}[/b] is '
-                                                   f'[b]{self.role_dictionary[player].noun}[/b]. They are the [b]'
-                                                   f'{self.role_dictionary[player].role}[/b]') + '\n' + '\n'
-                insti_text = ((f'Welcome to Instigator Chat. [b]You can only win with the Instigator, and can no '
-                               f'longer win with your original teams[/b].\n\n'
-                               f'{self.role_dictionary[self.memberid_to_gamenum(instigators[0])].screenname} is the '
-                               f'[b]Instigator[/b]. Their word is [b]'
-                               f'{self.role_dictionary[self.memberid_to_gamenum(instigators[0])].noun}[/b].\n\n') +
-                              insti_text)
-                insti_chat = tc.Chat()
-                insti_chat.create_conversation("Instigators Chat", insti_text, instigators)
-
-        # Set up Jailer/Warden Chat
-        self.jailed = []
-        self.jailer = 0  # is gamenum
-        for player in self.role_dictionary:
-            if self.role_dictionary[player].can_jail:
-                self.jailer = self.role_dictionary[player].gamenum
-            if self.role_dictionary[player].jailed is True:
-                self.jailed.append(self.role_dictionary[player])
-                # if jailed before, but NOT this time, they're eligible again
-            if self.role_dictionary[player].warden_eligible is False and self.role_dictionary[player].jailed is False:
-                self.role_dictionary[player].warden_eligible = True
-        # can tell warden/jailer by number of people jailed
-        if len(self.jailed) == 1:
-            body = ("You have been jailed. ANY messages you send here will be sent verbatim to the jailer in the "
-                    "next several minutes, and vice versa. You have no message limit.")
-            self.jailee_chat.create_conversation("Jailed", body,
-                                                 [self.gamenum_to_memberid(self.jailed[0].gamenum)])
-            body2 = (f"You have jailed your prisoner, {self.jailed[0].screenname}. ANY messages you send here will be "
-                     f"sent verbatim to your prisoner in the next several minutes, and vice versa. "
-                     f"You have no message limit.")
-            self.jailer_chat.create_conversation("On Duty", body2,
-                                                 [self.gamenum_to_memberid(self.jailer)])
-        elif len(self.jailed) == 2:
-            body = ("You have been jailed together. ANY messages you send here will be sent verbatim to the warden. "
-                    "You have no message limit.")
-            if self.jailed[0].category == 'Werewolf' and self.jailed[1].category == 'Werewolf':
-                body = body + '\n' + '\n' + ('(Since you are both wolves, you make break out of prison by either '
-                                             'of you writing "Wolfbot escape" [b]in your individual chat[/b] '
-                                             'with Wolfbot (not here).')
-            self.jailee_chat.create_conversation("Jailed", body,
-                                                 [self.gamenum_to_memberid(self.jailed[0].gamenum),
-                                                  self.gamenum_to_memberid(self.jailed[1].gamenum)])
-            body2 = (f"You have jailed your prisoners, {self.jailed[0].screenname} and {self.jailed[1].screenname}. "
-                     f"Any messages they write will be sent here. "
-                     f"To drop the weapon, do so in your original role PM")  # BW - IS THIS NECESSARY?
-            self.jailer_chat.create_conversation("On Duty", body2,
-                                                 [self.gamenum_to_memberid(self.jailer)])
-
-        # Iterate through all players to initialize game
-        for player in self.role_dictionary:
-            if night_number == 1:
-                self.role_dictionary[player].chat.create_conversation(f"{self.game_title} Role",
-                                                                      self.role_dictionary[player].initial_PM + '\n\n' +
-                                                                      "For night 1 only, you must choose to act against"
-                                                                      " this list of potential targets:" + '\n' +
-                                                                      self.get_randomized_nouns(),
-                                                                      [self.gamenum_to_memberid(
-                                                                          self.role_dictionary[player].gamenum)])
-            # Revert Conjuror if they didn't take a new role
-            if self.role_dictionary[player].conjuror is True and self.role_dictionary[player].new_role == 0:
-                self.role_swap(self.role_dictionary[player], self.saved_conjuror_data)
-            # Add speak with dead player back to dead forum
-            if self.role_dictionary[player].speak_with_dead and self.role_dictionary[player].alive:
-                self.mark_pm.write_message(f"Can you add {self.role_dictionary[player].screenname} please?")
-            # remove mutes
-            self.role_dictionary[player].muted = []
-            # WWFan shows role at start of night
-            if self.role_dictionary[player].role == 'Werewolf Fan':
-                [_, _, actions, membernames] = self.get_keyword_phrases(
-                    self.role_dictionary[player].chat.convo_pieces())
-                for j in range(len(actions)):
-                    self.role_dictionary[player].phased_action(actions[j], membernames[j])
-            # Revive players spelled by Ritualist if time period has been met, also dump Ritu MP
-            if self.role_dictionary[player].spelled and not self.role_dictionary[player].alive:
-                if self.spell_count > 1:
-                    self.day_thread.write_post(f'By some miracle, {self.role_dictionary[player].screenname} '
-                                               f'has returned to us from the dead.')
-                    self.role_dictionary[player].alive = True
-                    self.role_dictionary[player].spelled = False
-                self.spell_count += 1
-            if self.role_dictionary[player].role == 'Ritualist' and self.spell_count > 1:
-                self.role_dictionary[player].mp = 0
+        self.wolf_chat.create_conversation(f"{self.game_title} Wolf Chat", wolf_message, wolves_id)
 
     def phased_actions(self, rolelist):
         for player in self.role_dictionary:
-            if self.role_dictionary[player].role in rolelist:
+            if self.role_dictionary[player].role in rolelist and self.role_dictionary[player].alive:
                 if (not self.role_dictionary[player].jailed and not self.role_dictionary[player].concussed
                         and not self.role_dictionary[player].nightmared):
                     [_, _, actions, victims] = self.get_keyword_phrases(
@@ -795,7 +703,8 @@ Winning Conditions:
         # Go through all players, but we only care about the solo killers
         for solo_killer in self.role_dictionary:  # player is solo killer
             # Apply to solo killers
-            if self.role_dictionary[solo_killer].role in rolelist:  # Infector and Illusionist have different priority
+            if (self.role_dictionary[solo_killer].role in rolelist
+                    and self.role_dictionary[solo_killer].alive):  # Infector and Illusionist have different priority
                 # If abilities aren't available then just skip everything
                 if (not self.role_dictionary[solo_killer].jailed and not self.role_dictionary[solo_killer].concussed
                         and not self.role_dictionary[solo_killer].nightmared):
@@ -946,7 +855,7 @@ Winning Conditions:
                 weakest_wolf_power = self.role_dictionary[i].wolf_order
                 weakest_wolf = self.role_dictionary[i]
         # These bypass protection
-        if not berserk:
+        if not berserk and not self.role_dictionary[attacked].poisoned:
             # protected_by is dictionary with keyword = role, values = list of role objects of that
             # role attempting to protect this player.
             for j in self.role_dictionary[attacked].protected_by:
@@ -1036,13 +945,131 @@ Winning Conditions:
             else:
                 self.wolf_chat.write_message(f"Your target ({self.role_dictionary[attacked].screenname}) "
                                              f"could not be killed!")
-        else:
+        elif berserk:
             # kill everyone with berserk
             self.new_thread_text = (self.new_thread_text + self.kill_player(
                 "wolf", weakest_wolf, self.role_dictionary[attacked]))
             for deads in self.role_dictionary[attacked].protected_by:
                 self.new_thread_text = (self.new_thread_text + self.kill_player(
                     "berserk", weakest_wolf, deads))
+
+        elif self.role_dictionary[attacked].poisoned:
+            self.new_thread_text = (self.new_thread_text + self.kill_player(
+                "toxic", weakest_wolf, self.role_dictionary[attacked]))
+
+    def start_night(self, night_number):
+        self.first_death = role.Player()
+        self.day_thread.create_thread(f"{self.game_title} Day {night_number}", self.day_post())
+        self.day_thread.lock_thread()
+        self.day_thread.stick_thread()
+        if night_number == 1:
+            # get noun list
+            # Set up dead forum with Mark
+            self.mark_pm.create_conversation("New Wolf game", r'''Hi Mark,
+            
+            Could you please reset the dead forum for another game?''', [3])
+            # Set up Wolf Chat
+            self.create_wolf_chat(night_number)
+            # Set up Instigator Chat
+            instigators = []  # holds member ids
+            for player in self.role_dictionary:
+                if self.role_dictionary[player].role == 'Instigator':
+                    instigators.append(self.gamenum_to_memberid(self.role_dictionary[player].gamenum))
+                    self.instigator = self.role_dictionary[player]
+            if len(instigators) > 0:
+                insti_text = ''
+                for player in self.role_dictionary:
+                    if self.role_dictionary[player].instigated:
+                        instigators.append(self.gamenum_to_memberid(self.role_dictionary[player].gamenum))
+                        insti_text = insti_text + (f'The word for [b]{self.role_dictionary[player].screenname}[/b] is '
+                                                   f'[b]{self.role_dictionary[player].noun}[/b]. They are the [b]'
+                                                   f'{self.role_dictionary[player].role}[/b]') + '\n' + '\n'
+                insti_text = ((f'Welcome to Instigator Chat. [b]You can only win with the Instigator, and can no '
+                               f'longer win with your original teams[/b].\n\n'
+                               f'{self.role_dictionary[self.memberid_to_gamenum(instigators[0])].screenname} is the '
+                               f'[b]Instigator[/b]. Their word is [b]'
+                               f'{self.role_dictionary[self.memberid_to_gamenum(instigators[0])].noun}[/b].\n\n') +
+                              insti_text)
+                insti_chat = tc.Chat()
+                insti_chat.create_conversation("Instigators Chat", insti_text, instigators)
+
+        # Set up Jailer/Warden Chat
+        self.jailed = []
+        self.jailer = 0  # is gamenum
+        for player in self.role_dictionary:
+            if self.role_dictionary[player].can_jail:
+                self.jailer = self.role_dictionary[player].gamenum
+            if self.role_dictionary[player].jailed is True:
+                self.jailed.append(self.role_dictionary[player])
+                # if jailed before, but NOT this time, they're eligible again
+            if self.role_dictionary[player].warden_eligible is False and self.role_dictionary[player].jailed is False:
+                self.role_dictionary[player].warden_eligible = True
+        # can tell warden/jailer by number of people jailed
+        if len(self.jailed) == 1:
+            body = ("You have been jailed. ANY messages you send here will be sent verbatim to the jailer in the "
+                    "next several minutes, and vice versa. You have no message limit.")
+            self.jailee_chat.create_conversation("Jailed", body,
+                                                 [self.gamenum_to_memberid(self.jailed[0].gamenum)])
+            body2 = (f"You have jailed your prisoner, {self.jailed[0].screenname}. ANY messages you send here will be "
+                     f"sent verbatim to your prisoner in the next several minutes, and vice versa. "
+                     f"You have no message limit.")
+            self.jailer_chat.create_conversation("On Duty", body2,
+                                                 [self.gamenum_to_memberid(self.jailer)])
+        elif len(self.jailed) == 2:
+            body = ("You have been jailed together. ANY messages you send here will be sent verbatim to the warden. "
+                    "You have no message limit.")
+            if self.jailed[0].category == 'Werewolf' and self.jailed[1].category == 'Werewolf':
+                body = body + '\n' + '\n' + ('(Since you are both wolves, you make break out of prison by either '
+                                             'of you writing "Wolfbot escape" [b]in your individual chat[/b] '
+                                             'with Wolfbot (not here).')
+            self.jailee_chat.create_conversation("Jailed", body,
+                                                 [self.gamenum_to_memberid(self.jailed[0].gamenum),
+                                                  self.gamenum_to_memberid(self.jailed[1].gamenum)])
+            body2 = (f"You have jailed your prisoners, {self.jailed[0].screenname} and {self.jailed[1].screenname}. "
+                     f"Any messages they write will be sent here. "
+                     f"To drop the weapon, do so in your original role PM")  # BW - IS THIS NECESSARY?
+            self.jailer_chat.create_conversation("On Duty", body2,
+                                                 [self.gamenum_to_memberid(self.jailer)])
+
+        # Iterate through all players to initialize game
+        for player in self.role_dictionary:
+            if night_number == 1:
+                self.role_dictionary[player].chat.create_conversation(f"{self.game_title} Role",
+                                                                      self.role_dictionary[player].initial_PM + '\n\n' +
+                                                                      "For night 1 only, you must choose to act against"
+                                                                      " this list of potential targets:" + '\n' +
+                                                                      self.get_randomized_nouns(),
+                                                                      [self.gamenum_to_memberid(
+                                                                          self.role_dictionary[player].gamenum)])
+            # Revert Conjuror if they didn't take a new role
+            if self.role_dictionary[player].conjuror is True and self.role_dictionary[player].new_role == 0:
+                self.role_swap(self.role_dictionary[player], self.saved_conjuror_data)
+            # Add speak with dead player back to dead forum
+            if self.role_dictionary[player].speak_with_dead and self.role_dictionary[player].alive:
+                self.mark_pm.write_message(f"Can you add {self.role_dictionary[player].screenname} please?")
+            # remove mutes
+            self.role_dictionary[player].muted_by = []
+            # WWFan shows role at start of night
+            if self.role_dictionary[player].role == 'Werewolf Fan':
+                [_, _, actions, membernames] = self.get_keyword_phrases(
+                    self.role_dictionary[player].chat.convo_pieces())
+                for j in range(len(actions)):
+                    self.role_dictionary[player].phased_action(actions[j], membernames[j])
+            # Revive players spelled by Ritualist if time period has been met, also dump Ritu MP
+            if self.role_dictionary[player].spelled and not self.role_dictionary[player].alive:
+                if self.spell_count > 1:
+                    self.day_thread.write_post(f'By some miracle, {self.role_dictionary[player].screenname} '
+                                               f'has returned to us from the dead.')
+                    self.role_dictionary[player].alive = True
+                    self.role_dictionary[player].spelled = False
+                    # If we are reviving someone who caused seer apprentices to convert, then convert seer app back
+                    if self.role_dictionary[player].first_seer:
+                        for seer_app in self.role_dictionary:
+                            if self.role_dictionary[seer_app].seer_apprentice:
+                                self.role_swap(self.role_dictionary[seer_app], role.SeerApprentice())
+                self.spell_count += 1
+            if self.role_dictionary[player].role == 'Ritualist' and self.spell_count > 1:
+                self.role_dictionary[player].mp = 0
 
     def end_night(self):
         self.new_thread_text = ''
@@ -1051,6 +1078,9 @@ Winning Conditions:
         # Nightmare, Shaman, WWFan, Jailing all take place at start of night (Phase 0)
         # PHASE 1
         self.phased_actions(['Wolf Avenger', 'Avenger', 'Loudmouth', 'Wolf Trickster', 'Confusion Wolf'])
+        for i in self.role_dictionary:
+            if self.role_dictionary[i].confusion:
+                self.confusion_in_effect = True
 
         # PHASE 2 (Wolves break out of warden prison or warden weapon used)
         if len(self.jailed) == 2:
@@ -1161,27 +1191,23 @@ Winning Conditions:
                 self.role_dictionary[player].apparent_team = "Illusionist"
                 self.role_dictionary[player].apparent_role = "Illusionist"
 
-        # Write method to deal with warden weapon
-        # Go through attack order
-        # See who is credited with protect (take witch potion / flagger redirect if successful)
-        # Take MP where actions are successful
-        # Figure out flagger redirect
-        # Do Preacher and sheriff watching + spirit seer results
-        # IS TG triggered?
-        # On protection, message protectors IN ORDER
-        # solo attack method?
-        # wolf attack method?
-        # Add first to die to array, pass to Violinist
-        # handle berserk
-        # handle red lady visits including visiting attacked player
-        # handle solo kill attempts
-        # NEW WOLF CHAT DURING NIGHT IF SORC RESIGNS
-        # New wolf chat at end of day if fan turned
-        # Run werewolf fan shown only at start of night, not end of night
-        pass
+            if self.role_dictionary[player].reviving:
+                self.new_thread_text = (self.new_thread_text +
+                                        (f'By some miracle, {self.role_dictionary[player].screenname} '
+                                         f'has returned to us from the dead.'))
+                self.role_dictionary[player].alive = True
+                self.role_dictionary[player].reviving = False
+                # If we are reviving someone who caused seer apprentices to convert, then convert seer app back
+                if self.role_dictionary[player].first_seer:
+                    for seer_app in self.role_dictionary:
+                        if self.role_dictionary[seer_app].seer_apprentice:
+                            self.role_swap(self.role_dictionary[seer_app], role.SeerApprentice())
 
     def start_day(self, day_number):
         self.day_thread.unlock_thread()
+        self.day_open_tm = datetime.datetime.now()
+        self.day_close_tm = self.day_open_tm + datetime.timedelta(hours=24)
+        self.confusion_in_effect = False
         # check if Cupid
         for player in self.role_dictionary:
             if self.role_dictionary[player].role == 'Cupid':
@@ -1215,7 +1241,10 @@ Winning Conditions:
             cupid_chat = self.cupid.chat
             cupid_chat.write_message(f"Your couple is {self.couple[0].screenname} and "
                                      f"{self.couple[1].screenname}. Good luck!")
-
+        rand_time = random.random()*20+2
+        self.alch_deaths_tm = (self.day_open_tm + datetime.timedelta(hours=rand_time//1) +
+                               datetime.timedelta(minutes=60 * (rand_time % 1)))  # Time of alch deaths
+        alive = []  # List of players for poll
         # iterate through players to perform actions
         for player in self.role_dictionary:
             # Reset things from the night/previous day that no longer apply
@@ -1225,6 +1254,7 @@ Winning Conditions:
             self.role_dictionary[player].jailed = False
             self.role_dictionary[player].lynchable = True
             self.role_dictionary[player].sheriff_watched_by = []
+            self.role_dictionary[player].seen_by = []
             self.role_dictionary[player].protected_by['Flagger'] = []
             self.role_dictionary[player].protected_by['Doctor'] = []
             self.role_dictionary[player].protected_by['Jailer'] = []
@@ -1233,13 +1263,14 @@ Winning Conditions:
             self.role_dictionary[player].protected_by['Tough'] = []
             self.role_dictionary[player].protected_by['Defender'] = []
             self.role_dictionary[player].protected_by['Beast Hunter'] = []  # Trap will be replaced during the night
-            self.role_dictionary[player].shamaned = False
+            self.role_dictionary[player].shamaned_by = []
             self.role_dictionary[player].has_killed = False
             self.role_dictionary[player].checked = 0
+            self.role_dictionary[player].poisoned = False
             self.role_dictionary[player].given_warden_weapon = False
             # remove "old" mute so they are eligible to be muted again the next night.
             if self.role_dictionary[player].role in ['Voodoo Wolf', 'Librarian']:
-                del self.role_dictionary[player].muting[0]
+                del self.role_dictionary[player].acting_upon[0]
             # Have Mark remove speak_with_dead players from the dead forum
             if self.role_dictionary[player].speak_with_dead:
                 self.mark_pm.write_message(f"Can you remove {player.screenname} please?")
@@ -1260,7 +1291,42 @@ Winning Conditions:
             # Marksman has finished their waiting period to shoot
             if self.role_dictionary[player].role == 'Marksman':
                 self.role_dictionary[player].cooldown = False
-    # Handle red and black potion, corruptor, other solos?
+            if self.role_dictionary[player].role == 'Confusion Wolf':
+                self.role_dictionary[player].confusion = False
+            if self.role_dictionary[player].role == 'Berserk Wolf':
+                self.role_dictionary[player].berserking = False
+            if self.role_dictionary[player].role in ['Flower Child', 'Guardian Wolf']:
+                self.role_dictionary[player].acting_upon = []
+            if self.role_dictionary[player].alive:
+                alive.append(self.role_dictionary[player])
+            if len(self.role_dictionary[player].muted_by) > 0:
+                self.role_dictionary[player].chat.write_message("You have been muted! Please refrain from posting or "
+                                                                "reacting in today's thread. You also may not vote in "
+                                                                "the poll. You may still use daytime abilities if you "
+                                                                "have them.")
+            if len(self.role_dictionary[player].corrupted_by) > 0:
+                self.role_dictionary[player].chat.write_message("You have been corrupted! You will die at the end of "
+                                                                "the day unless the Corruptor is killed. Please "
+                                                                "refrain from posting or reacting in today's thread as "
+                                                                "well as any other game chats you may be a part of "
+                                                                "(such as wolf chat). All your abilities are currently"
+                                                                " disabled. You also may not vote in the poll. ")
+            if len(self.role_dictionary[player].infected_by) > 0:
+                self.role_dictionary[player].chat.write_message("You have been infected! You will die at the end of "
+                                                                "the day unless the Infector is killed.")
+        self.day_thread.create_poll(alive)
+
+    def end_day(self):
+        # all weapons and shields done being forged
+        # self.forging_gun = False
+        # self.forger_guns.append(self.gamenum)
+        # if not lynch, do a judgment check
+        # reset infector seen by
+        # IS TG triggered?
+        # Infector and Corruptor
+        self.phased_actions(['Shaman Wolf'])
+        self.phased_actions(['Nightmare Wolf'])
+        self.phased_actions(['Jailer', 'Warden'])
 
     def run_day_checks(self):
         # role.check_action
@@ -1269,6 +1335,7 @@ Winning Conditions:
         # Enforce shadow and illu kill limits and timeframe
         # Figure out shadow votes and alpha chatting
         # Check for gun shots by forger armed players
+        # Kill at alch deaths tm
         for player in self.role_dictionary:
             if player.conjuror is True and player.new_role != 0:
                 self.role_swap(player, player.new_role)
@@ -1277,16 +1344,6 @@ Winning Conditions:
         # Swap Sorc for Werewolf if resigned
         pass
 
-    def end_day(self):
-        # all weapons and shields done being forged
-        # self.forging_gun = False
-        # self.forger_guns.append(self.gamenum)
-        # if not lynch, do a judgment check
-        # reset infector seen by
-        self.phased_actions(['Shaman Wolf'])
-        self.phased_actions(['Nightmare Wolf'])
-        self.phased_actions(['Jailer', 'Warden'])
-
     def kill_player(self, method, killer, victim):
         if self.first_death.screenname == '':
             self.first_death = victim
@@ -1294,19 +1351,22 @@ Winning Conditions:
         secondary_text = ''
         if victim.alive is False:
             return ''
+        # If victim is jellied, no kill
         if len(victim.jellied_by) > 0:
             for jellier in victim.jellied_by:
                 jellier.mp = 0
                 del victim.jellied_by[victim.jellied_by.index(jellier)]
                 jellier.chat.write_message(f"Your protection on {victim.screenname} has been consumed.")
             return 'The Jelly Wolf protection has been consumed.'
-        if len(victim.scribed) != 0:
-            method = victim.scribed[-1]  # Take most recent scribed info
+        if victim.role == 'Alpha Wolf' and victim.extra_life:
+            victim.extra_list = False
+            return 'The Alpha Wolf has been attacked.'
+        if len(victim.scribed_by) > 0:
+            method = victim.scribe_method[-1]  # Take most recent scribed info
             wolf_scribe = self.role_dictionary[victim.scribed_by[-1]]  # Who is responsible for the scribing
             wolf_scribe.mp = wolf_scribe.mp - 50  # Deduct their MP
             del victim.scribed[-1]  # Clean up
             del victim.scribed_by[-1]  # Clean up
-            # BW HOW TO UNSCRIBE UPON SCRIBE DEATH? WHAT ABOUT ALL DEATHS BY PEOPLE EXERTING POWER, WHAT IF MULTIPLE?
         # Victim gets most attributes reset
         victim.alive = False
         victim.doused_by = []
@@ -1332,6 +1392,17 @@ Winning Conditions:
         victim.has_killed = False
         victim.poisoned = False
         victim.lynchable = True
+        if len(victim.tricked_by) > 0:
+            victim.apparent_role = 'Wolf Trickster'
+            for wolf in victim.tricked_by:
+                wolf.mp = 0
+                wolf.tricking = 0
+                wolf.apparent_role = victim.role
+                wolf.apparent_aura = victim.aura
+                wolf.apparent_team = victim.team
+            victim.tricked_by = []
+        if self.confusion_in_effect:
+            victim.apparent_role = '??????'
         # if victim was watched by the bell ringer
         if len(victim.bell_ringer_watched_by) > 0:
             # watcher is the bell ringer who is getting info
@@ -1353,24 +1424,27 @@ Winning Conditions:
                 watcher.chat.write_message(f"{victim.screenname} is dead. You have gained an additional vote.")
         victim.preacher_watched_by = []
         # if victim was watched by the sheriff, they are killed by normal wolf/solo at night
-        if len(victim.sheriff_watched_by) > 0 and method in ['wolf', 'toxic', 'arsonist', 'sacrificed', 'cult',
-                                                             'detective', 'instigator', 'stabbed']:
-            alive = []
-            # get all alives
-            for i in self.role_dictionary:
-                if self.role_dictionary[i].alive:
-                    alive.append(self.role_dictionary[i])
-            del alive[alive.index(killer)]
-            # watcher is the sheriff who is getting info
-            for watcher in victim.sheriff_watched_by:
-                order = random.randint(1, 2)
-                rand_player = random.randint(0, len(alive) - 1)
-                if order == 1:
-                    watcher.chat.write_message(f"{victim.screenname} is dead. They were killed by either "
-                                               f"{killer.screenname} or {alive[rand_player]}.")
-                else:
-                    watcher.chat.write_message(f"{victim.screenname} is dead. They were killed by either "
-                                               f"{alive[rand_player]} or {killer.screenname}.")
+        if method in ['wolf', 'toxic', 'arsonist', 'sacrificed', 'cult', 'detective', 'instigator', 'stabbed']:
+            if len(victim.sheriff_watched_by) > 0:
+                alive = []
+                # get all alives
+                for i in self.role_dictionary:
+                    if self.role_dictionary[i].alive:
+                        alive.append(self.role_dictionary[i])
+                del alive[alive.index(killer)]
+                # watcher is the sheriff who is getting info
+                for watcher in victim.sheriff_watched_by:
+                    order = random.randint(1, 2)
+                    rand_player = random.randint(0, len(alive) - 1)
+                    if order == 1:
+                        watcher.chat.write_message(f"{victim.screenname} is dead. They were killed by either "
+                                                   f"{killer.screenname} or {alive[rand_player]}.")
+                    else:
+                        watcher.chat.write_message(f"{victim.screenname} is dead. They were killed by either "
+                                                   f"{alive[rand_player]} or {killer.screenname}.")
+            if len(victim.visited) > 0:
+                for redlady in victim.visited:
+                    secondary_text = secondary_text + self.kill_player("poorvisit", victim, redlady)
         victim.sheriff_watched_by = []
         if victim.coupled:
             # Uncouple the pair so recursion works
@@ -1392,15 +1466,6 @@ Winning Conditions:
             secondary_text = secondary_text + self.kill_player("couple", victim, self.couple[0])
             # Unleash Instigator
             self.instigator.instigators_dead = True
-        if len(victim.tricked_by) > 0:
-            victim.apparent_role = 'Wolf Trickster'
-            for wolf in victim.tricked_by:
-                wolf.mp = 0
-                wolf.tricking = 0
-                wolf.apparent_role = victim.role
-                wolf.apparent_aura = victim.aura
-                wolf.apparent_team = victim.team
-            victim.tricked_by = []
         if victim.cult:
             secondary_text = secondary_text + f"{victim.screenname} was a member of the cult."
         if victim.hhtarget and method == 'lynched':
@@ -1412,8 +1477,15 @@ Winning Conditions:
             for player in self.jailed:
                 player.jailed = False
                 player.protected_by['Jailer'] = []
+        if victim.seer:
+            for player in self.role_dictionary:
+                if self.role_dictionary[player].role == 'Seer Apprentice':
+                    victim.first_seer = True
+                    self.role_swap(self.role_dictionary[player], victim)  # BW WHAT ABOUT REVERSION UPON REVIVAL?
+                    # Revert all actions to apply to gamenums because of role changes!
         elif victim.role in ['Avenger', 'Wolf Avenger']:
-            secondary_text = secondary_text + self.kill_player("avenger", victim, victim.avenging)
+            if len(victim.acting_upon) > 0:
+                secondary_text = secondary_text + self.kill_player("avenger", victim, victim.acting_upon[-1])
         # Remove protections by now-dead player
         elif victim.role in ('Flagger', 'Doctor', 'Bodyguard', 'Witch', 'Tough Guy',
                              'Defender', 'Beast Hunter'):
@@ -1427,13 +1499,75 @@ Winning Conditions:
                     delindex = self.role_dictionary[player].protected_by[victim.role].index(victim)
                     del self.role_dictionary[player].protected_by[victim.role][delindex]
         elif victim.role == 'Bell Ringer':
-            delindex = victim.bell_ringer_pair[0].bell_ringer_watched_by.index(victim)
-            del victim.bell_ringer_pair[0].bell_ringer_watched_by[delindex]
-            delindex = victim.bell_ringer_pair[1].bell_ringer_watched_by.index(victim)
-            del victim.bell_ringer_pair[1].bell_ringer_watched_by[delindex]
+            delindex = victim.acting_upon[0].bell_ringer_watched_by.index(victim)
+            del victim.acting_upon[0].bell_ringer_watched_by[delindex]
+            delindex = victim.acting_upon[1].bell_ringer_watched_by.index(victim)
+            del victim.acting_upon[1].bell_ringer_watched_by[delindex]
+            victim.acting_upon = []
         elif victim.role in ('Flower Child', 'Guardian Wolf'):
-            victim.saved_lynch.lynchable = True
-        # WWFan
+            victim.acting_upon = []
+        elif victim.role == 'Loudmouth':
+            if len(victim[0].acting_upon) > 0:
+                secondary_text = secondary_text + (f"The Loudmouth has revealed the role of "
+                                                   f"{victim[0].acting_upon[-1].screenname}. "
+                                                   f"They are the {victim[0].acting_upon[-1].role}.")
+        elif victim.role == 'Marksman':
+            victim.cooldown = False
+            victim.acting_upon = [role.Player()]
+        elif victim.role == 'Preacher':
+            delindex = victim.acting_upon[0].preacher_watched_by.index(victim)
+            del victim.acting_upon[0].preacher_watched_by[delindex]
+            victim.acting_upon = []
+        elif victim.role == 'Sheriff':
+            if len(victim[0].acting_upon) > 0:
+                delindex = victim.acting_upon[0].sheriff_watched_by.index(victim)
+                del victim.acting_upon[0].sheriff_watched_by[delindex]
+                victim.acting_upon = []
+        elif victim.role == 'Jelly Wolf':
+            if len(victim[0].acting_upon) > 0:
+                delindex = victim.acting_upon[0].jellied_by.index(victim)
+                del victim.acting_upon[0].jellied_by[delindex]
+                victim.acting_upon = []
+        elif victim.role == 'Wolf Scribe':
+            if len(victim[0].acting_upon) > 0:
+                delindex = victim.acting_upon[0].scribed_by.index(victim)
+                del victim.acting_upon[0].scribed_by[delindex]
+                del victim.acting_upon[0].scribe_method[delindex]
+                victim.acting_upon = []
+        elif victim.role == 'Wolf Trickster':
+            if len(victim[0].acting_upon) > 0:
+                delindex = victim.acting_upon[0].tricked_by.index(victim)
+                del victim.acting_upon[0].tricked_by[delindex]
+                victim.acting_upon = []
+        elif victim.role == 'Werewolf Fan' and method in ['wolf', 'toxic']:
+            self.role_swap(victim, role.Werewolf())
+            self.create_wolf_chat(0)
+            return ''
+        elif victim.role == 'Arsonist':
+            for doused in victim.acting_upon:
+                delindex = doused.doused_by.index(victim)
+                del doused.doused_by[delindex]
+            victim.acting_upon = []
+        elif victim.role == 'Illusionist':
+            for disguised in victim.acting_upon:
+                delindex = disguised.disguised_by.index(victim)
+                del disguised.disguised_by[delindex]
+            victim.acting_upon = []
+        elif victim.role == 'Corruptor':
+            if len(victim[0].acting_upon) > 0:
+                delindex = victim.acting_upon[0].corrupted_by.index(victim)
+                del victim.acting_upon[0].corrupted_by[delindex]
+                victim.acting_upon = []
+        elif victim.role == 'Infector':
+            if len(victim[0].acting_upon) > 0:
+                delindex = victim.acting_upon[0].infected_by.index(victim)
+                del victim.acting_upon[0].infected_by[delindex]
+                victim.acting_upon = []
+        elif victim.role == 'Cult Leader':
+            for player in self.role_dictionary:
+                if self.role_dictionary[player].cult:
+                    self.role_dictionary[player].cult = False
+                    secondary_text = secondary_text + self.kill_player("couple", victim, self.role_dictionary[player])
         # Go through and print messages for each death method
         if method == 'lynched':
             return (f"[b]{victim.screenname}[/b] was lynched by the village. "
@@ -1499,6 +1633,7 @@ Winning Conditions:
             return (f"[b]{victim.screenname}[/b] was killed in the fire. "
                     f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
         elif method == 'corruptor':
+            victim.corrupted_by = [0]
             return (f"[b]{victim.screenname}[/b] was killed by the Corruptor. "
                     f"{victim.screenname} was the [b]??????[/b].\n" + secondary_text)
         elif method == 'sacrificed':
@@ -1513,7 +1648,6 @@ Winning Conditions:
             return (f"[b]{victim.screenname}[/b] was killed by the Illusionist. "
                     f"{victim.screenname} was the [b]Illusionist[/b].\n" + secondary_text)
         elif method == 'infector':
-            killer.has_killed = True
             return (f"[b]{victim.screenname}[/b] was killed by the Infector. "
                     f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
         elif method == 'detective':
