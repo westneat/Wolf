@@ -81,6 +81,8 @@ class Game:
         self.cupid = role.Player()
         self.instigator = role.Player()
         self.confusion_in_effect = False
+        self.manual_votes = []
+        self.shadow_in_effect = False
 
     # These methods are necessary as different identifiers are used for different purposes,
     # and we need to be able to go between them easily
@@ -566,7 +568,6 @@ Winning Conditions:
         corrupted_by = old_role.corrupted_by
         cult = old_role.cult
         infected_by = old_role.infected_by
-        seen_by = old_role.seen_by
         instigated = old_role.instigated
         protected_by = old_role.protected_by
         conjuror = old_role.conjuror
@@ -621,7 +622,6 @@ Winning Conditions:
         new_role.cult = cult
         new_role.scribed_by = scribed_by
         new_role.infected_by = infected_by
-        new_role.seen_by = seen_by
         new_role.instigated = instigated
         new_role.protected_by = protected_by
         new_role.conjuror = conjuror
@@ -684,7 +684,7 @@ Winning Conditions:
                 if (not self.role_dictionary[player].jailed and not self.role_dictionary[player].concussed
                         and not self.role_dictionary[player].nightmared):
                     [_, _, actions, victims] = self.get_keyword_phrases(
-                        self.role_dictionary[player].chat.convo_pieces())
+                        self.role_dictionary[player].chat.convo_pieces())  # remove all before "cancel" - BW
                     if len(actions) == 0:  # do this so that the phased method gets run even if the player does nothing
                         actions = ['null']
                         victims = ['null']
@@ -698,6 +698,9 @@ Winning Conditions:
                         if len(outcome) == 1:  # Place Beast Hunter Trap if timeframe reached
                             self.role_dictionary[outcome[0]].protected_by['Beast Hunter'].append(
                                 self.role_dictionary[player])
+                        if len(outcome) == 2:
+                            if outcome[0] == 'vote':
+                                self.manual_votes.extend(outcome[1])
 
     def solo_attack(self, rolelist):
         # Go through all players, but we only care about the solo killers
@@ -804,8 +807,9 @@ Winning Conditions:
                                     if (j == 'Forger' and len(self.role_dictionary[attacked].protected_by[j]) > 0
                                             and not blocked):
                                         blocked = True
-                                        self.role_dictionary[attacked].has_forger_shield = (
-                                                self.role_dictionary[attacked].has_forger_shield - 1)
+                                        self.role_dictionary[attacked].has_forger_shield = 0
+                                        self.role_dictionary[attacked].chat.write_message(
+                                            "You have been attacked. You no longer have any Forger protection.")
                                 for j in self.role_dictionary[attacked].protected_by:
                                     if (j == 'Beast Hunter' and len(self.role_dictionary[attacked].protected_by[j]) > 0
                                             and not blocked):
@@ -926,8 +930,9 @@ Winning Conditions:
                 if (j == 'Forger' and len(self.role_dictionary[attacked].protected_by[j]) > 0
                         and not blocked):
                     blocked = True
-                    self.role_dictionary[attacked].has_forger_shield = (
-                            self.role_dictionary[attacked].has_forger_shield - 1)
+                    self.role_dictionary[attacked].has_forger_shield = 0
+                    self.role_dictionary[attacked].chat.write_message(
+                        "You have been attacked. You no longer have any Forger protection.")
             for j in self.role_dictionary[attacked].protected_by:
                 if (j == 'Beast Hunter' and len(self.role_dictionary[attacked].protected_by[j]) > 0
                         and not blocked):
@@ -1056,7 +1061,8 @@ Winning Conditions:
                 for j in range(len(actions)):
                     self.role_dictionary[player].phased_action(actions[j], membernames[j])
             # Revive players spelled by Ritualist if time period has been met, also dump Ritu MP
-            if self.role_dictionary[player].spelled and not self.role_dictionary[player].alive:
+            if (self.role_dictionary[player].spelled and not self.role_dictionary[player].alive
+                    and len(self.role_dictionary[player].corrupted_by) == 0):
                 if self.spell_count > 1:
                     self.day_thread.write_post(f'By some miracle, {self.role_dictionary[player].screenname} '
                                                f'has returned to us from the dead.')
@@ -1177,7 +1183,6 @@ Winning Conditions:
 
         # Phase 14
         self.phased_actions(['Forger'])
-        self.phased_actions(['Forger'])
 
         # PHASE LAST
         for player in self.role_dictionary:
@@ -1207,6 +1212,7 @@ Winning Conditions:
         self.day_thread.unlock_thread()
         self.day_open_tm = datetime.datetime.now()
         self.day_close_tm = self.day_open_tm + datetime.timedelta(hours=24)
+        self.manual_votes = []
         self.confusion_in_effect = False
         # check if Cupid
         for player in self.role_dictionary:
@@ -1254,7 +1260,6 @@ Winning Conditions:
             self.role_dictionary[player].jailed = False
             self.role_dictionary[player].lynchable = True
             self.role_dictionary[player].sheriff_watched_by = []
-            self.role_dictionary[player].seen_by = []
             self.role_dictionary[player].protected_by['Flagger'] = []
             self.role_dictionary[player].protected_by['Doctor'] = []
             self.role_dictionary[player].protected_by['Jailer'] = []
@@ -1317,13 +1322,81 @@ Winning Conditions:
         self.day_thread.create_poll(alive)
 
     def end_day(self):
-        # all weapons and shields done being forged
-        # self.forging_gun = False
-        # self.forger_guns.append(self.gamenum)
-        # if not lynch, do a judgment check
-        # reset infector seen by
-        # IS TG triggered?
-        # Infector and Corruptor
+        poll_results = {}
+        if not self.shadow_in_effect:
+            # Run Preacher check to see if there are any more votes out there
+            self.phased_actions(['Preacher'])
+            # Get results from poll
+            poll_results = self.day_thread.get_poll_results()
+            # If we have additional votes, add them in before the final tally
+            if len(self.manual_votes) > 0:
+                for additional_vote in self.manual_votes:
+                    voted_ind = poll_results['Name'].index(additional_vote.screenname)
+                    poll_results['Vote Count'][voted_ind] += 1
+
+        # Shadow in effect
+        else:
+            votes = []
+            for player in self.role_dictionary:
+                if (self.role_dictionary[player].alive and not self.role_dictionary[player].concussed and
+                        len(self.role_dictionary[player].corrupted_by) == 0 and
+                        len(self.role_dictionary[player].muted_by) == 0):
+                    [_, _, actions, victims] = self.get_keyword_phrases(
+                        self.role_dictionary[player].chat.convo_pieces())  # remove all before "cancel" - BW
+                    for i in range(len(actions)):
+                        if actions[i] == "vote":
+                            outcome = self.role_dictionary[player].get_shadow_vote('vote', victims)
+                        else:
+                            continue
+                        votes.extend(outcome)
+                    votecount = []
+                    names = []
+                    for vote in votes:
+                        if vote in names:
+                            ind = names.index(vote)
+                            votecount[ind] += 1
+                        else:
+                            names.append(vote.screenname)
+                            votecount.append(1)
+                    poll_results = {'Name': names, 'Vote Count': votecount}
+        pandas_structure = pd.DataFrame.from_dict(poll_results)
+        pandas_structure = pandas_structure[pandas_structure['Name'] != 'No Vote']
+        alives = 0
+        for player in self.role_dictionary:
+            if self.role_dictionary[player].alive:
+                alives += 1
+        lynch_threshold = alives // 2
+        top_vote = pandas_structure['Vote Count'].max()
+        vote_winners = pandas_structure[pandas_structure['Vote Count'] == top_vote]
+        for player in self.role_dictionary:
+            if self.role_dictionary[player].screenname == vote_winners[0]:
+                vote_winner = self.role_dictionary[player]
+                if len(vote_winners) != 1 or top_vote < lynch_threshold:
+                    self.day_thread.write_post("The village could not decide who to lynch.")
+                    self.phased_actions(['Judge'])
+                elif not vote_winner.lynchable:
+                    self.day_thread.write_post(f"The village attempting to lynch {vote_winner.screenname}, but their "
+                                               f"lynch was prevented by a mysterious power.")
+                    for flower in self.role_dictionary:
+                        if (self.role_dictionary[flower].role in ('Guardian Wolf', 'Flower Child')
+                                and vote_winner in self.role_dictionary[flower].acting_upon):
+                            self.role_dictionary[flower].acting_upon = []
+                            self.role_dictionary[flower].mp = 0
+                            vote_winner.lynchable = True
+                else:
+                    self.kill_player("lynch", role.Player(), vote_winner)
+        for player in self.role_dictionary:
+            if len(self.role_dictionary[player].infected_by) > 0:
+                self.kill_player("infector",
+                                 self.role_dictionary[player].infected_by[0],
+                                 self.role_dictionary[player])
+            if len(self.role_dictionary[player].corrupted_by) > 0:
+                self.kill_player("corruptor",
+                                 self.role_dictionary[player].corrupted_by[0],
+                                 self.role_dictionary[player])
+            if self.role_dictionary[player].role == 'Tough Guy':
+                if self.role_dictionary[player].triggered:
+                    self.kill_player("tough", role.Player(), self.role_dictionary[player])
         self.phased_actions(['Shaman Wolf'])
         self.phased_actions(['Nightmare Wolf'])
         self.phased_actions(['Jailer', 'Warden'])
@@ -1337,8 +1410,24 @@ Winning Conditions:
         # Check for gun shots by forger armed players
         # Kill at alch deaths tm
         for player in self.role_dictionary:
-            if player.conjuror is True and player.new_role != 0:
+            if player.conjuror is True and player.new_role.role != player.role:
                 self.role_swap(player, player.new_role)
+            if (self.role_dictionary[player].alive and not self.role_dictionary[player].concussed
+                    and len(self.role_dictionary[player].corrupted_by) == 0):
+                [_, _, actions, victims] = self.get_keyword_phrases(self.role_dictionary[player].chat.convo_pieces())
+                for i in range(len(actions)):
+                    outcome = self.role_dictionary[player].immediate_action(actions[i], victims[i])
+                    if outcome[0] == 'Illusionist':
+                        text = ''
+                        self.role_dictionary[player].acting_upon = []
+                        for pot_dead in self.role_dictionary:
+                            if self.role_dictionary[pot_dead].disguised:
+                                text = text + self.kill_player("illusionist",
+                                                               self.role_dictionary[player],
+                                                               self.role_dictionary[pot_dead])
+                                self.day_thread.write_post(text)
+                    elif len(outcome) == 3:
+                        self.day_thread.write_post(self.kill_player(outcome[0], outcome[1], outcome[2]))
 
     def run_night_check(self):
         # Swap Sorc for Werewolf if resigned
@@ -1376,7 +1465,6 @@ Winning Conditions:
         victim.nightmared = False
         victim.muted_by = []
         victim.infected_by = []
-        victim.seen_by = []
         victim.protected_by = []
         victim.jailed = False
         victim.given_warden_weapon = False
@@ -1396,8 +1484,7 @@ Winning Conditions:
             victim.apparent_role = 'Wolf Trickster'
             for wolf in victim.tricked_by:
                 wolf.mp = 0
-                wolf.tricking = 0
-                wolf.apparent_role = victim.role
+                wolf.acting_upon = []
                 wolf.apparent_aura = victim.aura
                 wolf.apparent_team = victim.team
             victim.tricked_by = []
@@ -1421,7 +1508,14 @@ Winning Conditions:
             # watcher is the preacher who is getting votes
             for watcher in victim.preacher_watched_by:
                 watcher.votes = watcher.votes + 1
-                watcher.chat.write_message(f"{victim.screenname} is dead. You have gained an additional vote.")
+                watcher.chat.write_message(f'{victim.screenname} is dead. You have gained an additional vote. '
+                                           f'Your normal vote will be used in the poll as usual.'
+                                           f'Your additional vote can be used anytime during the day by posting '
+                                           f'[b]here[/b]:\n\n'
+                                           f'Wolfbot vote (username)\n\n If you gain even more additional votes, '
+                                           f'separate the votes with "and". Such as:\n\n'
+                                           f'Wolfbot vote (username) and (username) and (username)\n\n'
+                                           f'for three votes. The username can be different or the same.')
         victim.preacher_watched_by = []
         # if victim was watched by the sheriff, they are killed by normal wolf/solo at night
         if method in ['wolf', 'toxic', 'arsonist', 'sacrificed', 'cult', 'detective', 'instigator', 'stabbed']:
@@ -1558,16 +1652,20 @@ Winning Conditions:
                 delindex = victim.acting_upon[0].corrupted_by.index(victim)
                 del victim.acting_upon[0].corrupted_by[delindex]
                 victim.acting_upon = []
+        # Check everyone because infection spreads
         elif victim.role == 'Infector':
-            if len(victim[0].acting_upon) > 0:
-                delindex = victim.acting_upon[0].infected_by.index(victim)
-                del victim.acting_upon[0].infected_by[delindex]
-                victim.acting_upon = []
+            victim.acting_upon = []
+            for player in self.role_dictionary:
+                if victim in self.role_dictionary[player].infected_by:
+                    delindex = self.role_dictionary[player].infected_by.index(victim)
+                    del self.role_dictionary[player].infected_by[delindex]
         elif victim.role == 'Cult Leader':
             for player in self.role_dictionary:
                 if self.role_dictionary[player].cult:
                     self.role_dictionary[player].cult = False
                     secondary_text = secondary_text + self.kill_player("couple", victim, self.role_dictionary[player])
+        # remove player from poll
+        self.day_thread.change_poll_item(victim.screenname, '')
         # Go through and print messages for each death method
         if method == 'lynched':
             return (f"[b]{victim.screenname}[/b] was lynched by the village. "
@@ -1686,9 +1784,6 @@ Winning Conditions:
             return (f"[b]{victim.screenname}[/b] died from their previously sustained injuries. "
                     f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
         return ''
-        # handle avenger and loudmouth
-        # seer apprentice inheritance
-        # remove MP from trickster
 
     def win_conditions(self, trigger='None'):
         pass

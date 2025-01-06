@@ -3,7 +3,6 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from subprocess import CREATE_NO_WINDOW
-import pandas as pd
 import time
 import requests
 import json
@@ -304,15 +303,7 @@ class Thread:
             names.append(votes[i]['text'])
             vote_count.append(votes[i]['vote_count'])
         final_structure = {'Name': names, 'Vote Count': vote_count}
-        pandas_structure = pd.DataFrame.from_dict(final_structure)
-        pandas_structure = pandas_structure[pandas_structure['Name'] != 'No Vote']
-        lynch_threshold = len(pandas_structure) // 2
-        top_vote = pandas_structure['Vote Count'].max()
-        vote_winners = pandas_structure[pandas_structure['Vote Count'] == top_vote]
-        if len(vote_winners) > 1 or top_vote < lynch_threshold:
-            return 'None'
-        else:
-            return vote_winners['Name'].iloc[0]
+        return final_structure
 
     def delete_poll(self):
         api_url = f"https://gwforums.com/api/threads/{self.thread_id}/change-type"
