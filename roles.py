@@ -235,8 +235,16 @@ class Player:
         return []
 
     def get_shadow_vote(self, keyword, voted):
-        if keyword == 'vote' and len(voted) == 1 and voted[0].alive and self.current_thread.open:
+        if (keyword == 'vote' and len(voted) == 1 and voted[0].alive and self.current_thread.open
+                and len(self.corrupted_by) == 0 and len(self.muted_by) == 0 and not self.concussed):
             return [voted[0]]
+        return []
+
+    def shoot_forger_gun(self, keyword, victims):
+        if (keyword == 'shoot' and len(victims) == 1 and victims[0].alive
+                and self.current_thread.open and self.has_forger_gun > 0):
+            self.has_forger_gun -= 1
+            return ['shoot', self, victims[0]]
         return []
 
 
@@ -370,7 +378,7 @@ class Gunner(Player):
         # victim is alive, and they haven't already shot today
         if (keyword == 'shoot' and len(victims) == 1 and self.mp >= 50 and victims[0].alive
                 and self.current_thread.thread_id != self.last_thread_id and victims[0].gamenum != self.gamenum
-                and self.current_thread.open):
+                and self.current_thread.open and self.has_forger_gun == 0):
             self.last_thread_id = self.current_thread.thread_id
             self.mp = self.mp - 50
             return ['gunner', self, victims[0]]
@@ -1722,6 +1730,7 @@ class ShadowWolf(Player):
         self.wolf_voting_power = 1
         self.screenname = screenname
         self.gamenum = gamenum
+        self.shadow = True
         self.noun = noun
         self.wolf_targetable = False
         self.conjuror_can_take = False
@@ -1742,12 +1751,13 @@ class ShadowWolf(Player):
             self.mp = self.mp - 100
             self.current_thread.delete_poll()
             self.current_thread.write_post("[b]Today's voting has been manipulated by the Shadow Wolf.[/b]")
-            self.shadow = True
+            self.shadow = False
             self.current_thread.post_shadow()
             if len(victims) == 1:
                 text = text + (f" You will need to vote {victims[0].screenname} "
                                f"in the normal wolf vote. Reminder that Wolf Chat is closed.")
             self.chat.write_message(text)
+            return ['shadow']
         return []
 
     def get_shadow_vote(self, keyword, voted):

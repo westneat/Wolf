@@ -7,7 +7,7 @@ import time
 import requests
 import json
 
-f = open("API.txt")
+f = open(r"Z:\API.txt")
 API_KEY = f.read()
 f.close()
 
@@ -118,7 +118,7 @@ class Chat:
         api_url = f"https://gwforums.com/api/conversations/{self.conv_id}/messages"
         response = requests.get(api_url, headers=self.headers)
         pages = json.loads(response.text)['pagination']['last_page']
-        items = [[], [], [], []]
+        items = [[], [], [], [], []]
         for page in range(1, pages+1):
             response = requests.get(api_url + f"?page={page}", headers=self.headers)
             posts = json.loads(response.text)['messages']
@@ -127,6 +127,7 @@ class Chat:
                 items[1].append(post['user_id'])  # who posted
                 items[2].append(parse_post(post['message']))  # what's message
                 items[3].append(post['is_reacted_to'])  # have we seen it before
+                items[4].append(post['message_date'])  # when posted
         return items
 
     def seen_message(self, messageid):
@@ -251,7 +252,7 @@ class Thread:
         api_url = f"https://gwforums.com/api/threads/{self.thread_id}/posts"
         response = requests.get(api_url, headers=self.headers)
         pages = json.loads(response.text)['pagination']['last_page']
-        items = [[], [], [], []]
+        items = [[], [], [], [], []]
         for page in range(1, pages+1):
             response = requests.get(api_url + f"?page={page}", headers=self.headers)
             posts = json.loads(response.text)['posts']
@@ -260,6 +261,7 @@ class Thread:
                 items[1].append(post['user_id'])  # who posted
                 items[2].append(parse_post(post['message'].replace('[', ' [').replace(']', '] ')))  # what's message
                 items[3].append(post['is_reacted_to'])  # have we seen it before
+                items[4].append(post['post_date'])  # when posted
         return items
 
     def seen_post(self, postid):
@@ -358,7 +360,7 @@ class Thread:
         driver.find_element(By.XPATH, r'//*[@id="top"]/div[1]/nav/div/div[3]/div[1]/a[1]/span').click()
         driver.find_element(By.NAME, "login").send_keys("WolfBot")
         time.sleep(2)
-        g = open("Password.txt")
+        g = open(r"Z:\Password.txt")
         passwd = g.read()
         g.close()
         driver.find_element(By.NAME, "password").send_keys(passwd)
