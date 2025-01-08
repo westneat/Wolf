@@ -14,10 +14,12 @@ keywords = ["arm", "visit", "check", "convert", "corrupt", "couple", "deaths",
             "shoot", "spell", "tag", "take", "trap", "trick", "watch", "water", "cancel",
             "vote", "berserk", "confusion", "shadow", "skip", "action", "escape"]
 
+output_dir = r"Games\\"
+
 
 # test data
 # [47, 157, 62, 101, 95, 65, 7, 40, 4, 8, 100, 82, 54, 67, 306, 18]
-#  Game object is responsible to manipulation of the game states
+# Game object is responsible to manipulation of the game states
 # Test Wolf Chat = 1425
 class Game:
     def __init__(self, player_list, game_title):
@@ -38,9 +40,6 @@ class Game:
         self.role_dictionary = {}  # gamenum : Role obj
         self.game_title = game_title
         self.player_list = player_list  # as memberids
-        self.alive_players = player_list.copy()
-#        self.id_to_player = {}
-#        self.player_to_id = {}
         self.player_game_numbers = {}  # game number : memberid
         self.wolf_chat = tc.Chat()
         self.mark_pm = tc.Chat()
@@ -272,7 +271,6 @@ class Game:
                             rand = random.randint(1, len(self.role_dictionary))
                             if self.role_dictionary[rand].hhtargetable and self.role_dictionary[rand].hhtarget is False:
                                 self.role_dictionary[i].target_name = self.gamenum_to_name(rand)
-                                self.role_dictionary[i].target_num = rand
                                 self.role_dictionary[rand].hhtarget = True
                                 break
         to_pandas = {
@@ -567,7 +565,6 @@ Winning Conditions:
     # Need to be a new role, but keep attributes that keep you "you"
     def role_swap(self, old_role, new_role):
         gamenum = old_role.gamenum
-        solo_kill_attempt = old_role.solo_kill_attempt
         bell_ringer_watched_by = old_role.bell_ringer_watched_by
         sheriff_watched_by = old_role.sheriff_watched_by
         preacher_watched_by = old_role.preacher_watched_by
@@ -601,7 +598,6 @@ Winning Conditions:
         black_potion = old_role.black_potion
         spelled = old_role.spelled
         scribed_by = old_role.scribed_by
-        trapped_by = old_role.trapped_by
         shadow = old_role.shadow
         shamaned_by = old_role.shamaned_by
         has_killed = old_role.has_killed
@@ -622,7 +618,6 @@ Winning Conditions:
         new_role.noun = noun
         new_role.gamenum = gamenum
         new_role.alive = True
-        new_role.solo_kill_attempt = solo_kill_attempt
         new_role.bell_ringer_watched_by = bell_ringer_watched_by
         new_role.sheriff_watched_by = sheriff_watched_by
         new_role.preacher_watched_by = preacher_watched_by
@@ -656,7 +651,6 @@ Winning Conditions:
         new_role.first_seer = first_seer
         new_role.seer_apprentice = seer_apprentice
         new_role.spelled = spelled
-        new_role.trapped_by = trapped_by
         new_role.shadow = shadow
         new_role.shamaned_by = shamaned_by
         new_role.has_killed = has_killed
@@ -670,7 +664,7 @@ Winning Conditions:
         new_role.voting_power = voting_power
         new_role.conjuror = conjuror
 
-    def create_wolf_chat(self, night_number):
+    def create_wolf_chat(self):
         wolves_id = []  # holds member ids
         wolf_message = "This is wolf chat." + '\n' + '\n'
         sorc_flag = False
@@ -692,7 +686,7 @@ Winning Conditions:
         if shadow_flag:
             wolf_message = wolf_message + ("Wolf Chat will be [b]Closed[/b] at the start of the day due "
                                            "to the Shadow Wolf.") + '\n' + '\n'
-        if night_number == 1:
+        if self.night == 1:
             wolf_message = wolf_message + ("For night 1 only, you must choose to act against this list of potential "
                                            "targets: ") + '\n' + self.get_randomized_nouns()
         self.wolf_chat.create_conversation(f"{self.game_title} Wolf Chat", wolf_message, wolves_id)
@@ -963,7 +957,7 @@ Winning Conditions:
                         self.new_thread_text = (self.new_thread_text + self.kill_player(
                             "trap", blocker, weakest_wolf))
 
-            if not blocked:
+            if not blocked and not self.role_dictionary[attacked].wolf_immune:
                 self.new_thread_text = (self.new_thread_text + self.kill_player(
                     "wolf", weakest_wolf, self.role_dictionary[attacked]))
             else:
@@ -971,30 +965,35 @@ Winning Conditions:
                                              f"could not be killed!")
         elif berserk:
             # kill everyone with berserk
-            self.new_thread_text = (self.new_thread_text + self.kill_player(
-                "wolf", weakest_wolf, self.role_dictionary[attacked]))
+            if not self.role_dictionary[attacked].wolf_immune:
+                self.new_thread_text = (self.new_thread_text +
+                                        self.kill_player("wolf", weakest_wolf, self.role_dictionary[attacked]))
             for deads in self.role_dictionary[attacked].protected_by:
                 self.new_thread_text = (self.new_thread_text + self.kill_player(
                     "berserk", weakest_wolf, deads))
 
-        elif self.role_dictionary[attacked].poisoned:
+        elif self.role_dictionary[attacked].poisoned and not self.role_dictionary[attacked].wolf_immune:
             self.new_thread_text = (self.new_thread_text + self.kill_player(
                 "toxic", weakest_wolf, self.role_dictionary[attacked]))
 
-    def start_night(self, night_number):
+        else:
+            self.wolf_chat.write_message(f"Your target ({self.role_dictionary[attacked].screenname}) "
+                                         f"could not be killed!")
+
+    def start_night(self):
         self.wolf_chat.open_chat()
         self.first_death = role.Player()
-        self.day_thread.create_thread(f"{self.game_title} Day {night_number}", self.day_post())
+        self.day_thread.create_thread(f"{self.game_title} Day {self.night}", self.day_post())
         self.day_thread.lock_thread()
         self.day_thread.stick_thread()
-        if night_number == 1:
+        if self.night == 1:
             # get noun list
             # Set up dead forum with Mark
             self.mark_pm.create_conversation("New Wolf game", r'''Hi Mark,
             
             Could you please reset the dead forum for another game?''', [3])
             # Set up Wolf Chat
-            self.create_wolf_chat(night_number)
+            self.create_wolf_chat()
             # Set up Instigator Chat
             instigators = []  # holds member ids
             for player in self.role_dictionary:
@@ -1058,7 +1057,7 @@ Winning Conditions:
 
         # Iterate through all players to initialize game
         for player in self.role_dictionary:
-            if night_number == 1:
+            if self.night == 1:
                 self.role_dictionary[player].chat.create_conversation(f"{self.game_title} Role",
                                                                       self.role_dictionary[player].initial_PM + '\n\n' +
                                                                       "For night 1 only, you must choose to act against"
@@ -1067,7 +1066,7 @@ Winning Conditions:
                                                                       [self.gamenum_to_memberid(
                                                                           self.role_dictionary[player].gamenum)])
             # Revert Conjuror if they didn't take a new role
-            if self.role_dictionary[player].conjuror is True and self.role_dictionary[player].new_role == 0:
+            if self.role_dictionary[player].conjuror is True and self.role_dictionary[player].new_role.gamenum == 0:
                 self.role_swap(self.role_dictionary[player], self.saved_conjuror_data)
             # Add speak with dead player back to dead forum
             if self.role_dictionary[player].speak_with_dead and self.role_dictionary[player].alive:
@@ -1232,7 +1231,7 @@ Winning Conditions:
                             self.role_swap(self.role_dictionary[seer_app], role.SeerApprentice())
         self.win_conditions()
 
-    def start_day(self, day_number):
+    def start_day(self):
         self.day_thread.unlock_thread()
         self.day_open_tm = datetime.datetime.now()
         self.day_close_tm = self.day_open_tm + datetime.timedelta(hours=24)
@@ -1254,7 +1253,7 @@ Winning Conditions:
         if self.shadow_available and is_alpha:
             self.wolf_chat.write_message("Wolf Chat is closed for the day, except the Alpha Wolf may post messages.")
         # If Cupid is in game, set up Lovers on day 1
-        if day_number == 1 and self.cupid.gamenum > 0:
+        if self.night == 1 and self.cupid.gamenum > 0:
             couple_num = []  # holds game nums
             self.couple = []  # holds role objects
             cupid_message = "You have fallen in love!" + '\n' + '\n'
@@ -1295,6 +1294,7 @@ Winning Conditions:
             self.role_dictionary[player].jailed = False
             self.role_dictionary[player].lynchable = True
             self.role_dictionary[player].sheriff_watched_by = []
+            self.role_dictionary[player].preacher_watched_by = []
             self.role_dictionary[player].protected_by['Flagger'] = []
             self.role_dictionary[player].protected_by['Doctor'] = []
             self.role_dictionary[player].protected_by['Jailer'] = []
@@ -1308,15 +1308,16 @@ Winning Conditions:
             self.role_dictionary[player].checked = 0
             self.role_dictionary[player].poisoned = False
             self.role_dictionary[player].given_warden_weapon = False
+            self.role_dictionary[player].visited = []
             # remove "old" mute so they are eligible to be muted again the next night.
             if self.role_dictionary[player].role in ['Voodoo Wolf', 'Librarian']:
                 del self.role_dictionary[player].acting_upon[0]
             # Have Mark remove speak_with_dead players from the dead forum
-            if self.role_dictionary[player].speak_with_dead:
+            if self.role_dictionary[player].speak_with_dead and self.role_dictionary[player].alive:
                 self.mark_pm.write_message(f"Can you remove {player.screenname} please?")
             # Conjuror defaults to reversion unless they pick a new target
             if self.role_dictionary[player].role == 'Conjuror':
-                player.new_role = 0
+                player.new_role = role.Player()
             # Revive players spelled by Ritualist if time period has been met, also dump Ritu MP
             if self.role_dictionary[player].spelled and not self.role_dictionary[player].alive:
                 if self.spell_count > 1:
@@ -1355,8 +1356,10 @@ Winning Conditions:
                 self.role_dictionary[player].chat.write_message("You have been infected! You will die at the end of "
                                                                 "the day unless the Infector is killed.")
         self.day_thread.create_poll(alive)
+        self.day_thread.write_post(self.new_thread_text)
 
     def end_day(self):
+        self.night += 1
         poll_results = {}
         if not self.shadow_in_effect:
             # Run Preacher check to see if there are any more votes out there
@@ -1464,7 +1467,7 @@ Winning Conditions:
         to_pandas = {'posts': public_posts, 'posters': public_posters,
                      'actions': public_actions, 'victims': public_victims, 'times': public_times}
         frame = pd.DataFrame.from_dict(to_pandas)
-        frame.sort_values('times')
+        frame = frame.sort_values('times')
         posts = frame['posts'].tolist()
         posters = frame['posters'].tolist()
         actions = frame['actions'].tolist()
@@ -1545,6 +1548,7 @@ Winning Conditions:
             del victim.scribed_by[-1]  # Clean up
         # Victim gets most attributes reset
         victim.alive = False
+        self.mark_pm.write_message(f"Can you add {victim.screenname} please?")
         victim.doused_by = []
         victim.disguised_by = []
         victim.concussed = False
@@ -1556,13 +1560,8 @@ Winning Conditions:
         victim.jailed = False
         victim.given_warden_weapon = False
         victim.warden_eligible = True
-        # victim.has_forger_gun = False
-        # victim.has_forger_shield = False
-        # victim.forger_guns = []
-        # victim.forger_shields = []
         victim.red_potion = 0
         victim.black_potion = False
-        victim.trapped_by = []
         victim.shamaned_by = []
         victim.has_killed = False
         victim.poisoned = False
@@ -1723,7 +1722,7 @@ Winning Conditions:
         elif victim.role == 'Werewolf Fan' and method in ['wolf', 'toxic']:
             self.role_swap(victim, role.Werewolf())
             self.wolf_chat.close_chat()
-            self.create_wolf_chat(0)
+            self.create_wolf_chat()
             return ''
         elif victim.role == 'Arsonist':
             for doused in victim.acting_upon:
@@ -1754,7 +1753,13 @@ Winning Conditions:
                     secondary_text = secondary_text + self.kill_player("couple", victim, self.role_dictionary[player])
         if victim.team == 'Wolf' and victim.role != 'Werewolf Fan':
             self.wolf_chat.close_chat()
-            self.create_wolf_chat(0)
+            self.create_wolf_chat()
+            wolves_left = []
+            for player in self.role_dictionary:
+                if self.role_dictionary[player].team == 'Wolf' and self.role_dictionary[player].role != 'Werewolf Fan':
+                    wolves_left.append(self.role_dictionary[player])
+            if len(wolves_left) == 1:
+                wolves_left[0].is_last_evil = True
         # remove player from poll
         self.day_thread.change_poll_item(victim.screenname, '')
         # Go through and print messages for each death method
@@ -1878,3 +1883,151 @@ Winning Conditions:
 
     def win_conditions(self, trigger='None'):
         pass
+
+    def output_data(self):
+        attributes = ['game_title', 'player_list', 'wolf_chat', 'mark_pm', 'new_thread_text', 'wolf_chat_open',
+                      'night', 'spell_count', 'player_names', 'player_names_caps', 'saved_conjuror_data',
+                      'global_rsv', 'global_rrv', 'global_rww', 'global_rv', 'global_rk', 'day_thread',
+                      'jailer_chat', 'jailee_chat', 'jailed', 'jailer', 'day_open_tm', 'day_close_tm', 'alch_deaths_tm',
+                      'first_death', 'couple', 'cupid', 'instigator', 'confusion_in_effect', 'manual_votes',
+                      'shadow_in_effect', 'shadow_available']
+        self.master_data.to_csv(f"{output_dir + self.game_title}.csv", index=False)
+        f = open(f"{output_dir + self.game_title}.txt", 'w')
+        for attribute in attributes:
+            if isinstance(self.__dict__[attribute], str):
+                f.write(attribute + ": " + "'" + self.__dict__[attribute] + "'" + '\n')
+            elif isinstance(self.__dict__[attribute], (int, bool)):
+                f.write(attribute + ": " + str(self.__dict__[attribute]) + '\n')
+            elif isinstance(self.__dict__[attribute], list):
+                f.write(attribute + ": [")
+                for i, item in enumerate(self.__dict__[attribute]):
+                    if i == len(self.__dict__[attribute]) - 1:
+                        if isinstance(item, (int, bool)):
+                            f.write(str(item))
+                        elif isinstance(item, str):
+                            f.write(str(item))
+                        elif isinstance(item, role.Player):
+                            f.write("Player(" + str(item.gamenum) + ')')
+                    else:
+                        if isinstance(item, (int, bool)):
+                            f.write(str(item) + ', ')
+                        elif isinstance(item, str):
+                            f.write(str(item) + ', ')
+                        elif isinstance(item, role.Player):
+                            f.write("Player(" + str(item.gamenum) + '), ')
+                f.write(']\n')
+            elif isinstance(self.__dict__[attribute], tc.Chat):
+                f.write(attribute + ": Chat(" + str(self.__dict__[attribute].conv_id) + ')\n')
+            elif isinstance(self.__dict__[attribute], tc.Thread):
+                f.write(attribute + ": Thread(" + str(self.__dict__[attribute].thread_id) + ')\n')
+            elif isinstance(self.__dict__[attribute], datetime.datetime):
+                f.write(attribute + ": " + str(self.__dict__[attribute]) + '\n')
+            elif isinstance(self.__dict__[attribute], role.Player):
+                f.write(attribute + ": Player(" + str(self.__dict__[attribute].gamenum) + ')\n')
+            else:
+                f.write(attribute + ": " + '\n')
+        f.close()
+        attributes = []
+        for player in self.role_dictionary:
+            g = open(f"{output_dir + self.game_title} Player {player}.txt", 'w')
+            for i in self.role_dictionary[player].__dict__:
+                attributes.append(i)
+            for attribute in attributes:
+                if isinstance(self.role_dictionary[player].__dict__[attribute], str):
+                    g.write(attribute + ": " + "'" + self.role_dictionary[player].__dict__[attribute] + "'" + '\n')
+                elif isinstance(self.role_dictionary[player].__dict__[attribute], (int, bool)):
+                    g.write(attribute + ": " + str(self.role_dictionary[player].__dict__[attribute]) + '\n')
+                elif isinstance(self.role_dictionary[player].__dict__[attribute], list):
+                    g.write(attribute + ": [")
+                    for i, item in enumerate(self.role_dictionary[player].__dict__[attribute]):
+                        if i == len(self.role_dictionary[player].__dict__[attribute]) - 1:
+                            if isinstance(item, (int, bool)):
+                                g.write(str(item))
+                            elif isinstance(item, str):
+                                g.write(str(item))
+                            elif isinstance(item, role.Player):
+                                g.write("Player(" + str(item.gamenum) + ')')
+                        else:
+                            if isinstance(item, (int, bool)):
+                                g.write(str(item) + ', ')
+                            elif isinstance(item, str):
+                                g.write(str(item) + ', ')
+                            elif isinstance(item, role.Player):
+                                g.write("Player(" + str(item.gamenum) + '), ')
+                    g.write(']\n')
+                elif isinstance(self.role_dictionary[player].__dict__[attribute], tc.Chat):
+                    g.write(attribute + ": Chat(" + str(self.role_dictionary[player].__dict__[attribute].conv_id)
+                            + ')\n')
+                elif isinstance(self.role_dictionary[player].__dict__[attribute], tc.Thread):
+                    g.write(attribute + ": Thread(" + str(self.role_dictionary[player].__dict__[attribute].thread_id)
+                            + ')\n')
+                elif isinstance(self.role_dictionary[player].__dict__[attribute], datetime.datetime):
+                    g.write(attribute + ": " + str(self.role_dictionary[player].__dict__[attribute]) + '\n')
+                elif isinstance(self.role_dictionary[player].__dict__[attribute], role.Player):
+                    g.write(attribute + ": Player(" + str(self.role_dictionary[player].__dict__[attribute].gamenum)
+                            + ')\n')
+                else:
+                    g.write(attribute + ": " + '\n')
+                attributes = []
+            g.close()
+        g = open(f"{output_dir + self.game_title} Conjuror Data.txt", 'w')
+        for i in self.saved_conjuror_data.__dict__:
+            attributes.append(i)
+        for attribute in attributes:
+            if isinstance(self.saved_conjuror_data.__dict__[attribute], str):
+                g.write(attribute + ": " + "'" + self.saved_conjuror_data.__dict__[attribute] + "'" + '\n')
+            elif isinstance(self.saved_conjuror_data.__dict__[attribute], (int, bool)):
+                g.write(attribute + ": " + str(self.saved_conjuror_data.__dict__[attribute]) + '\n')
+            elif isinstance(self.saved_conjuror_data.__dict__[attribute], list):
+                g.write(attribute + ": [")
+                for i, item in enumerate(self.saved_conjuror_data.__dict__[attribute]):
+                    if i == len(self.saved_conjuror_data.__dict__[attribute]) - 1:
+                        if isinstance(item, (int, bool)):
+                            g.write(str(item))
+                        elif isinstance(item, str):
+                            g.write(str(item))
+                        elif isinstance(item, role.Player):
+                            g.write("Player(" + str(item.gamenum) + ')')
+                    else:
+                        if isinstance(item, (int, bool)):
+                            g.write(str(item) + ', ')
+                        elif isinstance(item, str):
+                            g.write(str(item) + ', ')
+                        elif isinstance(item, role.Player):
+                            g.write("Player(" + str(item.gamenum) + '), ')
+                g.write(']\n')
+            elif isinstance(self.saved_conjuror_data.__dict__[attribute], tc.Chat):
+                g.write(attribute + ": Chat(" + str(self.saved_conjuror_data.__dict__[attribute].conv_id) + ')\n')
+            elif isinstance(self.saved_conjuror_data.__dict__[attribute], tc.Thread):
+                g.write(attribute + ": Thread(" + str(self.saved_conjuror_data.__dict__[attribute].thread_id) + ')\n')
+            elif isinstance(self.saved_conjuror_data.__dict__[attribute], datetime.datetime):
+                g.write(attribute + ": " + str(self.saved_conjuror_data.__dict__[attribute]) + '\n')
+            elif isinstance(self.saved_conjuror_data.__dict__[attribute], role.Player):
+                g.write(attribute + ": Player(" + str(self.saved_conjuror_data.__dict__[attribute].gamenum) + ')\n')
+            else:
+                g.write(attribute + ": " + '\n')
+        g.close()
+
+    def resume(self, data):
+        self.master_data = pd.read_csv(f"{output_dir + data}.csv")
+        temp = self.master_data.sort_values('Game Number')
+        nums = temp['Game Number'].to_list()
+        nouns = temp['Nouns'].to_list()
+        sorted_ids = temp['Player ID'].to_list()
+        self.noun_lookup = {}
+        for i in range(len(nums)):
+            self.noun_lookup[nums[i]] = nouns[i]
+            self.noun_lookup[nouns[i]] = nums[i]
+        upper_name = self.master_data['Player Name Caps'].to_list()
+        lower_name = self.master_data['Player Name'].to_list()
+        ids = self.master_data['Player ID'].to_list()
+        self.player_names_dict = {}
+        for i in range(len(lower_name)):
+            self.player_names_dict[upper_name[i]] = lower_name[i]
+            self.player_names_dict[ids[i]] = lower_name[i]
+            self.player_names_dict[lower_name[i]] = ids[i]
+        self.player_game_numbers = {'Game Number': nums,
+                                    'Player ID': sorted_ids,
+                                    'Nouns': nouns}
+
+        # datetime.datetime.strptime(temp2, '%Y-%m-%d %H:%M:%S.%f')

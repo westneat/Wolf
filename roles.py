@@ -120,58 +120,36 @@ class Player:
         self.gamenum = 0
         self.votes = 1
         self.extra_life = False
-        # Most Solos
-        self.solo_kill_attempt = []
-        # Werewolves
+        self.shield = False
+        self.cooldown = False
+        self.action_used = 0
+        self.bell_ringer_watched_by = []  # append player watching
+        self.sheriff_watched_by = []  # append player watching
+        self.preacher_watched_by = []  # append player watching
+        self.visited = []
+        self.doused_by = []
+        self.disguised_by = []
+        self.coupled = False
+        self.concussed = False
+        self.has_been_concussed = False
+        self.nightmared = False
+        self.tricked_by = []
+        self.jellied_by = []
+        self.muted_by = []
+        self.speak_with_dead = False
+        self.hhtarget = False
+        self.hhtargetable = True
         self.wolf_targetable = True
         self.waterable = False
         self.wolf_order = 0
         self.wolf_voting_power = 0
-        # Watched by Bell Ringer
-        self.bell_ringer_watched_by = []  # append player watching
-        # Sheriff watched
-        self.sheriff_watched_by = []  # append player watching
-        # Preacher watched
-        self.preacher_watched_by = []  # append player watching
-        # Red Lady
-        self.visited = []
-        # Arsonist doused
-        self.doused_by = []
-        # All Solos
         self.wolf_immune = False
-        # Illusionist disguised
-        self.disguised_by = []
-        # Pair Roles
-        self.coupled = False
-        # Used for role generation
         self.can_couple = False
-        # Bully
-        self.concussed = False
-        self.has_been_concussed = False
-        # Nightmare Wolf
-        self.nightmared = False
-        # Wolf Trickster
-        self.tricked_by = []
-        # Jelly Wolf
-        self.jellied_by = []
-        # Voodoo Wolf and Librarian
-        self.muted_by = []
-        # Conjuror/Medium/Ritualist, also used for role selection
-        self.speak_with_dead = False
-        # Headhunter
-        self.hhtarget = False
-        self.hhtargetable = True
-        # Corruptor
         self.corrupted_by = []
-        # All non-town
         self.mm_killable = False
-        # Cult Leader
         self.cult = False
-        # Infector
         self.infected_by = []
-        # Instigator
         self.instigated = False
-        # All protection roles (for berserk purposes)
         self.protected_by = {'Flagger': [],
                              'Doctor': [],
                              'Jailer': [],
@@ -182,49 +160,59 @@ class Player:
                              'Forger': [],
                              'Beast Hunter': []
                              }
-        # Conjuror
         self.conjuror = False
         self.conjuror_can_take = True
-        # Jailer/Warden
+        self.new_role = 0
         self.jailed = False
         self.given_warden_weapon = False
         self.can_jail = False
         self.warden_eligible = True
-        # Forger
         self.has_forger_gun = 0  # how many guns they have (multiple forgers)
         self.has_forger_shield = 0
         self.forger_guns = []  # who provided the guns
         self.forger_shields = []  # who provided the shields
+        self.spelled = False
+        self.shamaned_by = []
+        self.has_killed = False
+        self.seer = False
+        self.seer_apprentice = False
+        self.first_seer = False
+        self.poisoned = False
+        self.lynchable = True
+        self.scribe_method = []
+        self.scribed_by = []
+        # Forger
+        self.guns_forged = 0
+        self.shields_forged = 0
         # Alchemist
         self.red_potion = 0
         self.black_potion = False
-        # Ritualist
-        self.spelled = False
         # Beast Hunter
-        self.trapped_by = []  # BH trap
+        self.trap_on = 0
         # Shadow Wolf
         self.shadow = False
         # Confusion Wolf
         self.confusion = False
-        # Wolf Shaman
-        self.shamaned_by = []
+        # Berserk Wolf
+        self.berserking = False
+        # Wolf Shaman \ Sorcerer \ Blind Wolf \ Wolf Seer
         self.is_last_evil = False
-        # Seer Apprentice
-        self.seer = False
-        self.seer_apprentice = False
-        self.first_seer = False
-        # Spirit Seer
-        self.has_killed = False
-        # Toxic Wolf
-        self.poisoned = False
         # Blind Wolf / Sorcerer / Wolf Seer
         self.resigned = False
         self.checked = 0
-        # Flower Child and Guardian Wolf
-        self.lynchable = True
-        # Wolf Scribe
-        self.scribe_method = []
-        self.scribed_by = []
+        # Flagger
+        self.attacking = 0
+        # Tough Guy
+        self.triggered = False
+        # Witch
+        self.has_protect_potion = False
+        self.has_kill_potion = False
+        # Cupid
+        self.night = 0
+        # Headhunter
+        self.target_name = ''
+        # Instigator
+        self.instigators_dead = False
 
     # These methods all take the keyword and a LIST of role objects to apply them to
     def immediate_action(self, keyword, victims):
@@ -348,11 +336,11 @@ class Detective(Player):
                 self.chat.write_message(
                     f"{victims[0].screenname} and {victims[1].screenname} are on [b]different teams[/b].")
             if len(victims[0].infected_by) > 0:
-                self.infected_by = victims[0].infected_by
+                self.infected_by = victims[0].infected_by.copy()
                 self.chat.write_message(
                     f"You have been infected and will die at the end of the day if the Infector is not killed.")
             if len(victims[1].infected_by) > 0:
-                self.infected_by = victims[1].infected_by
+                self.infected_by = victims[1].infected_by.copy()
                 self.chat.write_message(
                     f"You have been infected and will die at the end of the day if the Infector is not killed.")
         return []
@@ -566,7 +554,7 @@ class AuraSeer(Player):
                 and victims[0].gamenum != self.gamenum and not self.current_thread.open):
             self.chat.write_message(f"{victims[0].screenname} is [b]{victims[0].apparent_aura}[/b].")
             if len(victims[0].infected_by) > 0:
-                self.infected_by = victims[0].infected_by
+                self.infected_by = victims[0].infected_by.copy()
                 self.chat.write_message(
                     f"You have been infected and will die at the end of the day if the Infector is not killed.")
         return []
@@ -1154,7 +1142,7 @@ class Sheriff(Player):
             victims[0].sheriff_watched_by.append(self)
             self.chat.write_message(f"You watched {victims[0]} tonight.")
             if len(victims[0].infected_by) > 0:
-                self.infected_by = victims[0].infected_by
+                self.infected_by = victims[0].infected_by.copy()
                 self.chat.write_message(
                     f"You have been infected and will die at the end of the day if the Infector is not killed.")
         return []
@@ -1213,11 +1201,11 @@ class SpiritSeer(Player):
                 self.chat.write_message(f"{victims[0].screenname} and {victims[1].screenname} are [b]Red[/b]. "
                                         f"One or both players killed someone last night.")
             if len(victims[0].infected_by) > 0:
-                self.infected_by = victims[0].infected_by
+                self.infected_by = victims[0].infected_by.copy()
                 self.chat.write_message(
                     f"You have been infected and will die at the end of the day if the Infector is not killed.")
             if len(victims[1].infected_by) > 0:
-                self.infected_by = victims[1].infected_by
+                self.infected_by = victims[1].infected_by.copy()
                 self.chat.write_message(
                     f"You have been infected and will die at the end of the day if the Infector is not killed.")
         if (keyword == 'watch' and len(victims) == 1 and victims[0].gamenum != self.gamenum
@@ -1229,7 +1217,7 @@ class SpiritSeer(Player):
                 self.chat.write_message(f"{victims[0].screenname} are [b]Red[/b]. "
                                         f"They killed someone last night.")
             if len(victims[0].infected_by) > 0:
-                self.infected_by = victims[0].infected_by
+                self.infected_by = victims[0].infected_by.copy()
                 self.chat.write_message(
                     f"You have been infected and will die at the end of the day if the Infector is not killed.")
         return []
@@ -1301,7 +1289,7 @@ class Violinist(Player):
                     f"{victims[0].screenname} is not mourning the death of {victims[1].screenname}. "
                     f"They are on [b]different teams[/b].")
             if len(victims[0].infected_by) > 0:
-                self.infected_by = victims[0].infected_by
+                self.infected_by = victims[0].infected_by.copy()
                 self.chat.write_message(
                     f"You have been infected and will die at the end of the day if the Infector is not killed.")
         elif keyword == 'check' and victims[1].screenname == '':
@@ -1443,12 +1431,14 @@ class ShamanWolf(Player):
         Wolfbot shaman (username)'''
 
     def immediate_action(self, keyword, victims):
-        if keyword == 'shaman' and len(victims) == 1 and victims[0].alive and victims[0].wolf_targetable:
+        if (keyword == 'shaman' and len(victims) == 1 and victims[0].alive
+                and victims[0].wolf_targetable and not self.is_last_evil):
             self.chat.write_message(f"You will enchant {victims[0].screenname} tonight.")
         return []
 
     def phased_action(self, keyword, victims):
-        if keyword == 'shaman' and len(victims) == 1 and victims[0].alive and victims[0].wolf_targetable:
+        if (keyword == 'shaman' and len(victims) == 1 and victims[0].alive
+                and victims[0].wolf_targetable and not self.is_last_evil):
             self.chat.write_message(f"{victims[0].screenname} has been enchanted.")
             victims[0].shamaned_by.append(self.gamenum)
         return []
@@ -1959,11 +1949,11 @@ class BlindWolf(Player):
                                     f"{victims[1].screenname} is the {victims[1].category}.")
             self.checked = 2
             if len(victims[0].infected_by) > 0:
-                self.infected_by = victims[0].infected_by
+                self.infected_by = victims[0].infected_by.copy()
                 self.chat.write_message(
                     f"You have been infected and will die at the end of the day if the Infector is not killed.")
             if len(victims[1].infected_by) > 0:
-                self.infected_by = victims[1].infected_by
+                self.infected_by = victims[1].infected_by.copy()
                 self.chat.write_message(
                     f"You have been infected and will die at the end of the day if the Infector is not killed.")
         if (keyword == 'check' and len(victims) == 1 and victims[0].alive and victims[0].wolf_targetable
@@ -1972,10 +1962,10 @@ class BlindWolf(Player):
             self.chat.write_message(f"{victims[0].screenname} is the {victims[0].category}.")
             self.checked = self.checked + 1
             if len(victims[0].infected_by) > 0:
-                self.infected_by = victims[0].infected_by
+                self.infected_by = victims[0].infected_by.copy()
                 self.chat.write_message(
                     f"You have been infected and will die at the end of the day if the Infector is not killed.")
-        if keyword == 'resign':
+        if keyword == 'resign' or self.is_last_evil:
             self.chat.write_message(f"You have resigned your powers.")
             self.resigned = True
             self.wolf_voting_power = 1
@@ -2020,10 +2010,10 @@ class WolfSeer(Player):
             self.chat.write_message(f"{victims[0].screenname} is the {victims[0].role}.")
             self.checked = self.checked + 1
             if len(victims[0].infected_by) > 0:
-                self.infected_by = victims[0].infected_by
+                self.infected_by = victims[0].infected_by.copy()
                 self.chat.write_message(
                     f"You have been infected and will die at the end of the day if the Infector is not killed.")
-        if keyword == 'resign':
+        if keyword == 'resign' or self.is_last_evil:
             self.chat.write_message(f"You have resigned your powers.")
             self.resigned = True
             self.wolf_voting_power = 1
@@ -2072,10 +2062,10 @@ class Sorcerer(Player):
             self.chat.write_message(f"{victims[0].screenname} is the {victims[0].role}.")
             self.checked = self.checked + 1
             if len(victims[0].infected_by) > 0:
-                self.infected_by = victims[0].infected_by
+                self.infected_by = victims[0].infected_by.copy()
                 self.chat.write_message(
                     f"You have been infected and will die at the end of the day if the Infector is not killed.")
-        if keyword == 'resign':
+        if keyword == 'resign' or self.is_last_evil:
             self.chat.write_message(f"You have resigned your powers and may participate in wolf chat.")
             self.resigned = True
             self.wolf_voting_power = 1
@@ -2182,7 +2172,6 @@ class Headhunter(Player):
         self.aura = 'Unknown'
         self.conjuror_can_take = False
         self.mm_killable = True
-        self.target_num = 0
         self.target_name = ''
         self.category = 'Wildcard'
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
