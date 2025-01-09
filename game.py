@@ -5,6 +5,7 @@ import pandas as pd
 import copy
 import datetime
 
+
 bot_member_id = 498
 
 keywords = ["arm", "visit", "check", "convert", "corrupt", "couple", "deaths",
@@ -22,7 +23,9 @@ output_dir = r"Games\\"
 # Game object is responsible to manipulation of the game states
 # Test Wolf Chat = 1425
 class Game:
-    def __init__(self, player_list, game_title):
+    def __init__(self, player_list=None, game_title=''):
+        if player_list is None:
+            player_list = []
         self.role_ids = [
             role.Bully, role.Conjuror, role.Detective, role.Gunner, role.Jailer,
             role.Medium, role.Ritualist, role.Warden, role.AuraSeer, role.Avenger,
@@ -75,6 +78,8 @@ class Game:
         self.day_open_tm = datetime.datetime.now()
         self.day_close_tm = datetime.datetime.now()
         self.alch_deaths_tm = datetime.datetime.now()
+        self.night_close_tm = datetime.datetime.now()
+        self.night_open_tm = datetime.datetime.now()
         self.first_death = role.Player()
         self.couple = []
         self.cupid = role.Player()
@@ -83,6 +88,9 @@ class Game:
         self.manual_votes = []
         self.shadow_in_effect = False
         self.shadow_available = False
+        self.game_over = False
+        self.death = False
+        self.tie_count = 0
 
     # These methods are necessary as different identifiers are used for different purposes,
     # and we need to be able to go between them easily
@@ -124,14 +132,20 @@ class Game:
     def memberid_to_noun(self, memberid):
         return self.noun_lookup[self.memberid_to_gamenum(memberid)]
 
-        # do every iteration in case names change
+    # do every iteration in case names change
     def rebuild_dict(self):
         self.player_names = [tc.get_membername(x) for x in self.player_list]
         self.player_names_caps = [x.upper() for x in self.player_names]
+        old_dict = self.player_names_dict.copy()
         self.player_names_dict = {}
+        # If a name is changed, we'll keep both the old and new
+        for i, number in enumerate(self.player_list):
+            if old_dict[number] not in self.player_names:
+                self.player_names_dict[old_dict[number]] = number
+                self.player_names_dict[old_dict[number].upper()] = number
         for i in range(len(self.player_names_caps)):
             self.player_names_dict[self.player_names_caps[i]] = self.player_names[i]
-            self.player_names_dict[i] = self.player_names[i]
+            self.player_names_dict[self.player_list[i]] = self.player_names[i]
             self.player_names_dict[self.player_names[i]] = self.player_list[i]
         to_pandas = {
             'Player ID': self.player_list,
@@ -139,10 +153,10 @@ class Game:
             'Player Name Caps': self.player_names_caps
         }
         to_merge = pd.DataFrame.from_dict(to_pandas)
-        self.master_data.drop(columns=['Player Name', 'Player Name Caps'])
+        self.master_data = self.master_data.drop(columns=['Player Name', 'Player Name Caps'])
         self.master_data = self.master_data.merge(to_merge, how='inner', on='Player ID')
 
-        # assigns players their game numbers
+    # assigns players their game numbers
     def assign_player_numbers(self):
         h = open("nouns.txt", 'r')
         temp = h.read()
@@ -458,6 +472,10 @@ Winning Conditions:
         phrases = [[], [], [], [], []]
         for index, message in enumerate(pieces[2]):
             message_uniform = message.upper().replace('"', '').replace("'", '').replace("@", '')
+            # if night 1, delete player names to avoid targeting
+            if self.night == 1:
+                for name in self.player_names_caps:
+                    message_uniform = message_uniform.replace(name, '')
             # replace all nouns with their corresponding name. No need to reverse.
             for gamenum in self.role_dictionary:
                 message_uniform = message_uniform.replace(self.noun_lookup[gamenum].upper(),
@@ -499,9 +517,9 @@ Winning Conditions:
             member_keyword_combos = []
             cancel = False
             for i in range(len(phrases[0]) - 1, -1, -1):
-                member_keyword = phrases[2][i] + str(phrases[1][i])
+                member_keyword = phrases[2][i] + phrases[1][i].screenname
                 if (member_keyword not in member_keyword_combos and
-                        phrases[1][i].screenname in self.player_list and not cancel):
+                        phrases[1][i].screenname in self.player_names and not cancel):
                     member_keyword_combos.append(member_keyword)
                     final_commands[0].append(phrases[0][i])  # returns post_id, reverse order
                     final_commands[1].append(phrases[1][i])  # returns player, reverse order
@@ -521,19 +539,43 @@ Winning Conditions:
             final_commands_in_order = phrases.copy()
         return final_commands_in_order
 
+    def wolf_vote_update(self):
+        pot_votes = self.get_keyword_phrases(self.wolf_chat.convo_pieces(), new=True)
+        post_ids = []
+        poster_ids = []
+        votes = []
+        for i in range(len(pot_votes[0])):
+            self.wolf_chat.seen_message(pot_votes[0][i])
+            if pot_votes[2][i] == "VOTE" and len(pot_votes[3][i]) == 1:
+                post_ids.append(pot_votes[0][i])  # returns post_id
+                poster_ids.append(self.gamenum_to_memberid(pot_votes[1][i].gamenum))  # returns poster_id as memberid
+                votes.append(pot_votes[3][i][0].screenname)  # returns who voted for as screenname
+        for i in range(len(post_ids)-1, -1, -1):
+            if (self.role_dictionary[self.name_to_gamenum(votes[i])].wolf_targetable is False or
+                    self.role_dictionary[self.memberid_to_gamenum(poster_ids[i])].wolf_voting_power == 0):
+                del post_ids[i]
+                del poster_ids[i]
+                del votes[i]
+        for i in range(len(pot_votes[1])):
+            self.wolf_chat.write_message(f"{pot_votes[1][i].screenname} is "
+                                         f"voting for [b]{pot_votes[3][i][0].screenname}[/b]")
+
     def count_wolf_votes(self):
         pot_votes = self.get_keyword_phrases(self.wolf_chat.convo_pieces())
         post_ids = []
         poster_ids = []
         votes = []
+        times = []
         for i in range(len(pot_votes[0])):
             if pot_votes[2][i] == "VOTE" and len(pot_votes[3][i]) == 1:
                 post_ids.append(pot_votes[0][i])  # returns post_id
-                poster_ids.append(pot_votes[1][i])  # returns poster_id as memberid
-                votes.append(pot_votes[3][i][0])  # returns who voted for as screenname
+                poster_ids.append(self.gamenum_to_memberid(pot_votes[1][i].gamenum))  # returns poster_id as memberid
+                votes.append(pot_votes[3][i][0].screenname)  # returns who voted for as screenname
+                times.append(pot_votes[4][i])
         for i in range(len(post_ids)-1, -1, -1):
             if (self.role_dictionary[self.name_to_gamenum(votes[i])].wolf_targetable is False or
-                    self.role_dictionary[self.memberid_to_gamenum(poster_ids[i])].wolf_voting_power == 0):
+                    self.role_dictionary[self.memberid_to_gamenum(poster_ids[i])].wolf_voting_power == 0 or
+                    datetime.datetime.fromtimestamp(times[i]) < self.night_open_tm):
                 del post_ids[i]
                 del poster_ids[i]
                 del votes[i]
@@ -981,6 +1023,9 @@ Winning Conditions:
                                          f"could not be killed!")
 
     def start_night(self):
+        self.night_close_tm = datetime.datetime.now() + datetime.timedelta(hours=12)
+        self.night_open_tm = datetime.datetime.now()
+        self.death = False
         self.wolf_chat.open_chat()
         self.first_death = role.Player()
         self.day_thread.create_thread(f"{self.game_title} Day {self.night}", self.day_post())
@@ -1095,6 +1140,7 @@ Winning Conditions:
                 self.spell_count += 1
             if self.role_dictionary[player].role == 'Ritualist' and self.spell_count > 1:
                 self.role_dictionary[player].mp = 0
+        self.output_data()
 
     def end_night(self):
         self.new_thread_text = ''
@@ -1229,12 +1275,17 @@ Winning Conditions:
                     for seer_app in self.role_dictionary:
                         if self.role_dictionary[seer_app].seer_apprentice:
                             self.role_swap(self.role_dictionary[seer_app], role.SeerApprentice())
+        if not self.death:
+            self.tie_count += 1
+        else:
+            self.tie_count = 0
         self.win_conditions()
+        self.output_data()
 
     def start_day(self):
+        self.death = False
         self.day_thread.unlock_thread()
         self.day_open_tm = datetime.datetime.now()
-        self.day_close_tm = self.day_open_tm + datetime.timedelta(hours=24)
         self.manual_votes = []
         self.confusion_in_effect = False
         self.shadow_available = False
@@ -1357,6 +1408,8 @@ Winning Conditions:
                                                                 "the day unless the Infector is killed.")
         self.day_thread.create_poll(alive)
         self.day_thread.write_post(self.new_thread_text)
+        self.day_close_tm = self.day_open_tm + datetime.timedelta(hours=24)
+        self.output_data()
 
     def end_day(self):
         self.night += 1
@@ -1436,13 +1489,19 @@ Winning Conditions:
             if self.role_dictionary[player].role == 'Tough Guy':
                 if self.role_dictionary[player].triggered:
                     self.kill_player("tough", role.Player(), self.role_dictionary[player])
-        self.win_conditions()
         self.phased_actions(['Shaman Wolf'])
         self.phased_actions(['Nightmare Wolf'])
         self.phased_actions(['Jailer', 'Warden'])
         self.shadow_in_effect = False
+        if not self.death:
+            self.tie_count += 1
+        else:
+            self.tie_count = 0
+        self.win_conditions()
+        self.output_data()
 
     def run_day_checks(self):
+        self.rebuild_dict()
         # Get posts from the thread
         [public_posts, public_posters, public_actions, public_victims, public_times] = (
             self.get_keyword_phrases(self.day_thread.thread_pieces(), dedupe=False, new=True))
@@ -1505,8 +1564,11 @@ Winning Conditions:
                 if player.role == 'Sorcerer' and player.resigned:
                     self.role_swap(player, role.Werewolf())
                 self.win_conditions()
+        self.output_data()
 
-    def run_night_check(self):
+    def run_night_checks(self):
+        self.rebuild_dict()
+        self.wolf_vote_update()
         for player in self.role_dictionary:
             if (self.role_dictionary[player].alive and not self.role_dictionary[player].jailed
                     and not self.role_dictionary[player].concussed and not self.role_dictionary[player].nightmared):
@@ -1522,6 +1584,7 @@ Winning Conditions:
                                 self.day_thread.write_post(self.kill_player(outcome[0], outcome[1], outcome[2])))
             if self.role_dictionary[player].role == 'Sorcerer' and self.role_dictionary[player].resigned:
                 self.role_swap(self.role_dictionary[player], role.Werewolf())
+        self.output_data()
 
     def kill_player(self, method, killer, victim):
         if self.first_death.screenname == '':
@@ -1548,6 +1611,7 @@ Winning Conditions:
             del victim.scribed_by[-1]  # Clean up
         # Victim gets most attributes reset
         victim.alive = False
+        self.death = True
         self.mark_pm.write_message(f"Can you add {victim.screenname} please?")
         victim.doused_by = []
         victim.disguised_by = []
@@ -1764,138 +1828,232 @@ Winning Conditions:
         self.day_thread.change_poll_item(victim.screenname, '')
         # Go through and print messages for each death method
         if method == 'lynched':
+            self.output_data()
             return (f"[b]{victim.screenname}[/b] was lynched by the village. "
                     f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
         elif method == 'rock':
+            self.output_data()
             return (f'[b]{victim.screenname}[/b] was hit by a rock and killed after being concussed. '
                     f'{killer.screenname} is the [b]Bully[/b].\n[b]{victim.screenname}[/b] is dead.'
                     f' {victim.screenname} was the [b]{victim.apparent_role}[/b].\n' + secondary_text)
         elif method == 'jailer':
             killer.has_killed = True
+            self.output_data()
             return (f"[b]{victim.screenname}[/b] was killed in jail. "
                     f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
         elif method == 'prisoner':
             killer.has_killed = True
+            self.output_data()
             return (f"[b]{victim.screenname}[/b] was killed by a fellow prisoner in jail. "
                     f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
         elif method == 'gunner':
+            self.output_data()
             return (f'[b]{killer.screenname}[/b] has shot and killed [b]{victim.screenname}[/b]. '
                     f'{killer.screenname} is the [b]Gunner[/b].\n{victim.screenname} is dead. '
                     f'{victim.screenname} was the [b]{victim.apparent_role}[/b].\n' + secondary_text)
         elif method == 'shot':
+            self.output_data()
             return (f"[b]{victim.screenname}[/b] was shot and killed. "
                     f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
         elif method == 'avenger':
+            self.output_data()
             return (f"The avenger has taken their revenge and killed [b]{victim.screenname}[/b]. "
                     f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
         elif method == 'trap':
             killer.has_killed = True
+            self.output_data()
             return (f"[b]{victim.screenname}[/b] was killed by the Beast Hunter's trap. "
                     f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
         elif method == 'marksman':
             killer.has_killed = True
+            self.output_data()
             return (f"[b]{victim.screenname}[/b] was shot and killed by the marksman. "
                     f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
         elif method == 'misfire':
+            self.output_data()
             return (f'{killer.screenname} was shot by the marksman and lived. '
                     f'[b]{victim.screenname}[/b] was killed by their own arrow. '
                     f'{victim.screenname} was the [b]{victim.apparent_role}[/b].\n' + secondary_text)
         elif method == 'water':
+            self.output_data()
             return (f"[b]{victim.screenname}[/b] was killed by holy water. "
                     f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
         elif method == 'drowned':
+            self.output_data()
             return (f"[b]{victim.screenname}[/b] killed themselves attempting to water {killer.screenname}. "
                     f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
         elif method == 'witch':
             killer.has_killed = True
+            self.output_data()
             return (f"[b]{victim.screenname}[/b] was killed by the Witch. "
                     f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
         elif method == 'wolf':
+            self.output_data()
             return (f"[b]{victim.screenname}[/b] was killed by the werewolves. "
                     f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
         elif method == 'berserk':
+            self.output_data()
             return (f"[b]{victim.screenname}[/b] was caught up in the werewolf berserk frenzy. "
                     f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
         elif method == 'toxic':
+            self.output_data()
             return (f"[b]{victim.screenname}[/b] was killed after being poisoned by the werewolves. "
                     f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
         elif method == 'alchemist':
+            self.output_data()
             return (f"[b]{victim.screenname}[/b] was killed by the Alchemist. "
                     f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
         elif method == 'arsonist':
             killer.has_killed = True
+            self.output_data()
             return (f"[b]{victim.screenname}[/b] was killed in the fire. "
                     f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
         elif method == 'corruptor':
             victim.corrupted_by = [0]
+            self.output_data()
             return (f"[b]{victim.screenname}[/b] was killed by the Corruptor. "
                     f"{victim.screenname} was the [b]??????[/b].\n" + secondary_text)
         elif method == 'sacrificed':
             killer.has_killed = True
+            self.output_data()
             return (f"[b]{victim.screenname}[/b] was sacrificed by the Cult Leader. "
                     f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
         elif method == 'cult':
             killer.has_killed = True
+            self.output_data()
             return (f"[b]{victim.screenname}[/b] was attacked by the Cult Leader. "
                     f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
         elif method == 'illusionist':
+            self.output_data()
             return (f"[b]{victim.screenname}[/b] was killed by the Illusionist. "
                     f"{victim.screenname} was the [b]Illusionist[/b].\n" + secondary_text)
         elif method == 'infector':
+            self.output_data()
             return (f"[b]{victim.screenname}[/b] was killed by the Infector. "
                     f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
         elif method == 'detective':
             killer.has_killed = True
+            self.output_data()
             return (f"[b]{victim.screenname}[/b] was killed by the Evil Detective. "
                     f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
         elif method == 'instigator':
             killer.has_killed = True
+            self.output_data()
             return (f"[b]{victim.screenname}[/b] was killed by the Instigator. "
                     f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
         elif method == 'stabbed':
             killer.has_killed = True
+            self.output_data()
             return (f"[b]{victim.screenname}[/b] was killed by the Serial Killer. "
                     f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
         elif method == 'coupled':
+            self.output_data()
             return (f"[b]{victim.screenname}[/b] is devastated by the loss of a person very close to them, "
                     f"and took their own life. {victim.screenname} was the "
                     f"[b]{victim.apparent_role}[/b].\n" + secondary_text)
         elif method == 'breakout':
+            self.output_data()
             return (f"[b]{victim.screenname}[/b] was killed by the werewolves breaking out of jail. "
                     f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
         elif method == 'judge':
+            self.output_data()
             return (f"[b]{victim.screenname}[/b] was rightfully killed by the Judge carrying out Justice. "
                     f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
         elif method == 'mistrial':
+            self.output_data()
             return (f'[b]{victim.screenname}[/b] was killed by townspeople after attempting to condemn '
                     f'{killer.screenname} to an innocent death.\n'
                     f'{victim.screenname} was the [b]{victim.apparent_role}[/b].\n' + secondary_text)
         elif method == 'evilvisit':
+            self.output_data()
             return (f"[b]{victim.screenname}[/b] killed visiting a killer. "
                     f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
         elif method == 'poorvisit':
+            self.output_data()
             return (f"[b]{victim.screenname}[/b] was attacked while visiting a player. "
                     f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
         elif method == 'tough':
+            self.output_data()
             return (f"[b]{victim.screenname}[/b] died from their previously sustained injuries. "
                     f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
         return ''
 
     def win_conditions(self, trigger='None'):
-        pass
+        player_count = 0
+        wolf_count = 0
+        solo_count = 0
+        couple_count = 0
+        cult_count = 0
+        insti_count = 0
+        self.output_data()
+
+        for player in self.role_dictionary:
+            if self.role_dictionary[player].alive:
+                player_count += 1
+            if self.role_dictionary[player].cult:
+                cult_count += 1
+            if self.role_dictionary[player].coupled:
+                couple_count += 1
+            if self.role_dictionary[player].instigated:
+                insti_count += 1
+            if self.role_dictionary[player].category == 'Solo Killer':
+                solo_count += 1
+            if (self.role_dictionary[player].category == 'Wolf' and
+                    self.role_dictionary[player].role not in ['Werewolf Fan', 'Sorcerer']):
+                wolf_count += 1
+
+        if trigger == 'Fool':
+            self.day_thread.write_post("[b]The game is over[/b]. The Fool has won!")
+            self.game_over = True
+
+        elif trigger == 'Headhunter':
+            self.day_thread.write_post("[b]The game is over[/b]. The Headhunter has won!")
+            self.game_over = True
+
+        elif self.tie_count >= 6:
+            self.day_thread.write_post("[b]The game is over[/b]. It's a tie!")
+
+        elif couple_count == 2 and (player_count == 2 or (player_count == 3 and self.cupid.alive)):
+            self.day_thread.write_post("[b]The game is over[/b]. The Lovers have won!")
+            self.game_over = True
+
+        elif insti_count == 2 and (player_count == 2 or (player_count == 3 and self.instigator.alive)):
+            self.day_thread.write_post("[b]The game is over[/b]. The Instigator team has won!")
+            self.game_over = True
+
+        elif solo_count == 1 and player_count == 1:
+            for player in self.role_dictionary:
+                if self.role_dictionary[player].role.alive:
+                    self.day_thread.write_post(f"[b]The game is over[/b]. "
+                                               f"The {self.role_dictionary[player].role} has won!")
+                    self.game_over = True
+
+        elif wolf_count >= player_count / 2 and solo_count == 0:
+            self.day_thread.write_post(f"[b]The game is over[/b]. The Wolves have won!")
+            self.game_over = True
+
+        elif wolf_count == 0 and solo_count == 0:
+            self.day_thread.write_post(f"[b]The game is over[/b]. The Village has won!")
+            self.game_over = True
+
+        elif player_count == 0:
+            self.day_thread.write_post(f"[b]The game is over[/b]. Everyone is dead. It's a tie!")
+            self.game_over = True
 
     def output_data(self):
+        # These are the game attributes we want to save
         attributes = ['game_title', 'player_list', 'wolf_chat', 'mark_pm', 'new_thread_text', 'wolf_chat_open',
-                      'night', 'spell_count', 'player_names', 'player_names_caps', 'saved_conjuror_data',
-                      'global_rsv', 'global_rrv', 'global_rww', 'global_rv', 'global_rk', 'day_thread',
-                      'jailer_chat', 'jailee_chat', 'jailed', 'jailer', 'day_open_tm', 'day_close_tm', 'alch_deaths_tm',
-                      'first_death', 'couple', 'cupid', 'instigator', 'confusion_in_effect', 'manual_votes',
-                      'shadow_in_effect', 'shadow_available']
+                      'night', 'spell_count', 'saved_conjuror_data', 'global_rsv', 'global_rrv', 'global_rww',
+                      'global_rv', 'global_rk', 'day_thread', 'jailer_chat', 'jailee_chat', 'jailed', 'jailer',
+                      'day_open_tm', 'day_close_tm', 'alch_deaths_tm', 'first_death', 'couple', 'cupid',
+                      'instigator', 'confusion_in_effect', 'manual_votes', 'shadow_in_effect', 'shadow_available']
+        # output master data to csv
         self.master_data.to_csv(f"{output_dir + self.game_title}.csv", index=False)
+        # output game attributes to a text file
         f = open(f"{output_dir + self.game_title}.txt", 'w')
         for attribute in attributes:
             if isinstance(self.__dict__[attribute], str):
-                f.write(attribute + ": " + "'" + self.__dict__[attribute] + "'" + '\n')
+                f.write(attribute + ": " + '"' + self.__dict__[attribute] + '"' + '\n')
             elif isinstance(self.__dict__[attribute], (int, bool)):
                 f.write(attribute + ": " + str(self.__dict__[attribute]) + '\n')
             elif isinstance(self.__dict__[attribute], list):
@@ -1917,24 +2075,29 @@ Winning Conditions:
                             f.write("Player(" + str(item.gamenum) + '), ')
                 f.write(']\n')
             elif isinstance(self.__dict__[attribute], tc.Chat):
-                f.write(attribute + ": Chat(" + str(self.__dict__[attribute].conv_id) + ')\n')
+                f.write(attribute + ": tc.Chat(" + str(self.__dict__[attribute].conv_id) + ')\n')
             elif isinstance(self.__dict__[attribute], tc.Thread):
-                f.write(attribute + ": Thread(" + str(self.__dict__[attribute].thread_id) + ')\n')
+                f.write(attribute + ": tc.Thread(" + str(self.__dict__[attribute].thread_id) + ')\n')
             elif isinstance(self.__dict__[attribute], datetime.datetime):
-                f.write(attribute + ": " + str(self.__dict__[attribute]) + '\n')
+                f.write(attribute + ": " + '"' + str(self.__dict__[attribute]) + '"' + '\n')
             elif isinstance(self.__dict__[attribute], role.Player):
                 f.write(attribute + ": Player(" + str(self.__dict__[attribute].gamenum) + ')\n')
             else:
                 f.write(attribute + ": " + '\n')
         f.close()
+        # output each player's attributes to individual text files
         attributes = []
         for player in self.role_dictionary:
             g = open(f"{output_dir + self.game_title} Player {player}.txt", 'w')
+            temp = str(type(self.role_dictionary[player]))
+            obj = temp[temp.find(".") + 1:temp.find("'>")]
+            g.write(f"object: {obj}\n")
             for i in self.role_dictionary[player].__dict__:
                 attributes.append(i)
+            del attributes[attributes.index('initial_PM')]
             for attribute in attributes:
                 if isinstance(self.role_dictionary[player].__dict__[attribute], str):
-                    g.write(attribute + ": " + "'" + self.role_dictionary[player].__dict__[attribute] + "'" + '\n')
+                    g.write(attribute + ": " + '"' + self.role_dictionary[player].__dict__[attribute] + '"' + '\n')
                 elif isinstance(self.role_dictionary[player].__dict__[attribute], (int, bool)):
                     g.write(attribute + ": " + str(self.role_dictionary[player].__dict__[attribute]) + '\n')
                 elif isinstance(self.role_dictionary[player].__dict__[attribute], list):
@@ -1956,26 +2119,37 @@ Winning Conditions:
                                 g.write("Player(" + str(item.gamenum) + '), ')
                     g.write(']\n')
                 elif isinstance(self.role_dictionary[player].__dict__[attribute], tc.Chat):
-                    g.write(attribute + ": Chat(" + str(self.role_dictionary[player].__dict__[attribute].conv_id)
+                    g.write(attribute + ": tc.Chat(" + str(self.role_dictionary[player].__dict__[attribute].conv_id)
                             + ')\n')
                 elif isinstance(self.role_dictionary[player].__dict__[attribute], tc.Thread):
-                    g.write(attribute + ": Thread(" + str(self.role_dictionary[player].__dict__[attribute].thread_id)
+                    g.write(attribute + ": tc.Thread(" + str(self.role_dictionary[player].__dict__[attribute].thread_id)
                             + ')\n')
                 elif isinstance(self.role_dictionary[player].__dict__[attribute], datetime.datetime):
-                    g.write(attribute + ": " + str(self.role_dictionary[player].__dict__[attribute]) + '\n')
+                    g.write(attribute + ": " + '"' + str(self.role_dictionary[player].__dict__[attribute]) + '"' + '\n')
                 elif isinstance(self.role_dictionary[player].__dict__[attribute], role.Player):
                     g.write(attribute + ": Player(" + str(self.role_dictionary[player].__dict__[attribute].gamenum)
                             + ')\n')
+                elif isinstance(self.role_dictionary[player].__dict__[attribute], dict):
+                    g.write(attribute + ": {")
+                    for key in self.role_dictionary[player].__dict__[attribute]:
+                        g.write("'" + key + "'" + ": [")
+                        for obj in self.role_dictionary[player].__dict__[attribute][key]:
+                            g.write("Player(" + str(obj.gamenum) + '), ')
+                        g.write("],")
+                    g.write("}\n")
                 else:
                     g.write(attribute + ": " + '\n')
                 attributes = []
             g.close()
+        # output the saved conjuror data just in case
         g = open(f"{output_dir + self.game_title} Conjuror Data.txt", 'w')
+        g.write("object: Conjuror\n")
         for i in self.saved_conjuror_data.__dict__:
             attributes.append(i)
+        del attributes[attributes.index('initial_PM')]
         for attribute in attributes:
             if isinstance(self.saved_conjuror_data.__dict__[attribute], str):
-                g.write(attribute + ": " + "'" + self.saved_conjuror_data.__dict__[attribute] + "'" + '\n')
+                g.write(attribute + ": " + '"' + self.saved_conjuror_data.__dict__[attribute] + '"' + '\n')
             elif isinstance(self.saved_conjuror_data.__dict__[attribute], (int, bool)):
                 g.write(attribute + ": " + str(self.saved_conjuror_data.__dict__[attribute]) + '\n')
             elif isinstance(self.saved_conjuror_data.__dict__[attribute], list):
@@ -1997,18 +2171,28 @@ Winning Conditions:
                             g.write("Player(" + str(item.gamenum) + '), ')
                 g.write(']\n')
             elif isinstance(self.saved_conjuror_data.__dict__[attribute], tc.Chat):
-                g.write(attribute + ": Chat(" + str(self.saved_conjuror_data.__dict__[attribute].conv_id) + ')\n')
+                g.write(attribute + ": tc.Chat(" + str(self.saved_conjuror_data.__dict__[attribute].conv_id) + ')\n')
             elif isinstance(self.saved_conjuror_data.__dict__[attribute], tc.Thread):
-                g.write(attribute + ": Thread(" + str(self.saved_conjuror_data.__dict__[attribute].thread_id) + ')\n')
+                g.write(attribute + ": tc.Thread(" + str(self.saved_conjuror_data.__dict__[attribute].thread_id) +
+                        ')\n')
             elif isinstance(self.saved_conjuror_data.__dict__[attribute], datetime.datetime):
-                g.write(attribute + ": " + str(self.saved_conjuror_data.__dict__[attribute]) + '\n')
+                g.write(attribute + ": " + '"' + str(self.saved_conjuror_data.__dict__[attribute]) + '"' + '\n')
             elif isinstance(self.saved_conjuror_data.__dict__[attribute], role.Player):
                 g.write(attribute + ": Player(" + str(self.saved_conjuror_data.__dict__[attribute].gamenum) + ')\n')
+            elif isinstance(self.saved_conjuror_data.__dict__[attribute], dict):
+                g.write(attribute + ": {")
+                for key in self.saved_conjuror_data.__dict__[attribute]:
+                    g.write("'" + key + "'" + ": [")
+                    for obj in self.saved_conjuror_data.__dict__[attribute][key]:
+                        g.write("Player(" + str(obj.gamenum) + '), ')
+                    g.write("],")
+                g.write("}\n")
             else:
                 g.write(attribute + ": " + '\n')
         g.close()
 
-    def resume(self, data):
+    def resume(self, data, delay=0):
+        # read the saved master data file back in, use it to generate some dictionaries
         self.master_data = pd.read_csv(f"{output_dir + data}.csv")
         temp = self.master_data.sort_values('Game Number')
         nums = temp['Game Number'].to_list()
@@ -2018,16 +2202,79 @@ Winning Conditions:
         for i in range(len(nums)):
             self.noun_lookup[nums[i]] = nouns[i]
             self.noun_lookup[nouns[i]] = nums[i]
-        upper_name = self.master_data['Player Name Caps'].to_list()
-        lower_name = self.master_data['Player Name'].to_list()
-        ids = self.master_data['Player ID'].to_list()
-        self.player_names_dict = {}
-        for i in range(len(lower_name)):
-            self.player_names_dict[upper_name[i]] = lower_name[i]
-            self.player_names_dict[ids[i]] = lower_name[i]
-            self.player_names_dict[lower_name[i]] = ids[i]
         self.player_game_numbers = {'Game Number': nums,
                                     'Player ID': sorted_ids,
                                     'Nouns': nouns}
-
-        # datetime.datetime.strptime(temp2, '%Y-%m-%d %H:%M:%S.%f')
+        self.rebuild_dict()
+        # read in each individuals data back into the correct role objects
+        players = [f"{data} Player {x + 1}.txt" for x in range(len(self.master_data))]
+        for i, player_file in enumerate(players):
+            f = open(output_dir + player_file)
+            obj = f.readline().strip('\n')
+            obj = obj[obj.find(": ")+2:]
+            exec(f"self.role_dictionary[i + 1] = role.{obj}()")
+            f.close()
+        for i, player_file in enumerate(players):
+            f = open(output_dir + player_file)
+            f.readline()
+            line = f.readline()
+            while line:
+                if "protected_by" not in line:
+                    code = line.replace(": ", " = ")
+                else:
+                    code = "protected_by = " + line[14:]
+                code = "self.role_dictionary[i + 1]." + code
+                if "Player(0)" in code:
+                    code = code.replace("Player(0)", "role.Player()")
+                elif "Player(" in code:
+                    code = code.replace("Player(", "self.role_dictionary[")
+                    code = code.replace(")", "]")
+                exec(code)
+                line = f.readline()
+            f.close()
+        # read the conjuror data
+        f = open(output_dir + data + " Conjuror Data.txt")
+        self.saved_conjuror_data = role.Conjuror()
+        f.readline()
+        line = f.readline()
+        while line:
+            if "protected_by" not in line:
+                code = line.replace(": ", " = ")
+            else:
+                code = "protected_by = " + line[14:]
+            code = "self.saved_conjuror_data." + code
+            if "Player(0)" in code:
+                code = code.replace("Player(0)", "role.Player()")
+            elif "Player(" in code:
+                code = code.replace("Player(", "self.role_dictionary[")
+                code = code.replace(")", "]")
+            exec(code)
+            line = f.readline()
+        f.close()
+        # read in the remaining game attributes, filling in the role data where needed
+        self.day_open_tm = ''
+        self.day_close_tm = ''
+        self.alch_deaths_tm = ''
+        self.night_close_tm = ''
+        self.night_open_tm = ''
+        f = open(output_dir + data + ".txt")
+        f.readline()
+        line = f.readline()
+        while line:
+            code = line.replace(": ", " = ")
+            code = "self." + code
+            if "Player(0)" in code:
+                code = code.replace("Player(0)", "role.Player()")
+            elif "Player(" in code:
+                code = code.replace("Player(", "self.role_dictionary[")
+                code = code.replace(")", "]")
+            exec(code)
+            line = f.readline()
+        self.day_open_tm = datetime.datetime.strptime(self.day_open_tm, '%Y-%m-%d %H:%M:%S.%f')
+        self.day_close_tm = (datetime.datetime.strptime(self.day_close_tm, '%Y-%m-%d %H:%M:%S.%f')
+                             + datetime.timedelta(hours=delay))
+        self.alch_deaths_tm = (datetime.datetime.strptime(self.alch_deaths_tm, '%Y-%m-%d %H:%M:%S.%f')
+                               + datetime.timedelta(hours=delay))
+        self.night_close_tm = (datetime.datetime.strptime(self.night_close_tm, '%Y-%m-%d %H:%M:%S.%f')
+                               + datetime.timedelta(hours=delay))
+        self.night_open_tm = datetime.datetime.strptime(self.night_open_tm, '%Y-%m-%d %H:%M:%S.%f')
