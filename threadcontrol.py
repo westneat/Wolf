@@ -54,7 +54,7 @@ def parse_post(text):
         if within_tag:
             if text[i:i+1] == ']':
                 within_tag = False
-    return parsed_text.replace('\n', '').replace('\t', '').replace('&nbsp;', ' ').replace('@', ' ').strip()
+    return parsed_text.replace('\n', ' ').replace('\t', ' ').replace('&nbsp;', ' ').replace('@', ' ').strip()
 
 
 # cleans up messages similar to XenForo for quoting purposes
@@ -160,7 +160,7 @@ class Thread:
             "Content-Type": "application/x-www-form-urlencoded"
             }
         self.forumid = 14
-        self.gameover = 35
+        self.trash = 35
         self.thread_prefix = 60
         self.thread_id = thread_id
         self.end_in_lynch = False
@@ -233,9 +233,8 @@ class Thread:
         requests.post(api_url, headers=self.headers, data=payload)
 
     def gameover(self):
-        self.lock_thread()
         self.unstick_thread()
-        self.move_thread(self.gameover)
+        self.move_thread(self.trash)
 
     def write_post(self, body):
         # [QUOTE="dimmerwit, post: 197510, member: 306"]

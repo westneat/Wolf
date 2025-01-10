@@ -12,7 +12,7 @@ keywords = ["arm", "visit", "check", "convert", "corrupt", "couple", "deaths",
             "kill", "mark", "mute", "nightmare", "poison", "potion", "protect",
             "redirect", "resign", "reveal", "revive", "rock", "sacrifice", "shaman",
             "shoot", "spell", "tag", "take", "trap", "trick", "watch", "water", "cancel",
-            "vote", "berserk", "confusion", "shadow", "skip", "action", "escape"]
+            "vote", "berserk", "confusion", "shadow", "skip", "action", "escape", "unskipped"]
 
 output_dir = r"Games\\"
 
@@ -93,6 +93,7 @@ class Game:
         self.tie_count = 0
         self.cult_chat = tc.Chat()
         self.cultleader = role.Player()
+        self.to_skip = []
 
     def print_nouns(self):
         bbcode = "[table]"
@@ -364,7 +365,9 @@ class Game:
                     wildcards_alive = True
                 elif 'Solo Killer' in self.role_dictionary[j].category:
                     solos_alive = True
-        text = (f'''Dictionary: https://gwforums.com/threads/zell-wolf-role-dictionary-and-hall-of-fame.427/
+        text = (f'''The day will start at [TIME=datetime]{self.day_open_tm.strftime('%Y-%M-%dT%H:%M:%S-0500')}[/TIME]
+        
+        Dictionary: https://gwforums.com/threads/zell-wolf-role-dictionary-and-hall-of-fame.427/
 
 Here's the list of players:
 
@@ -1057,10 +1060,11 @@ Winning Conditions:
         self.death = False
         self.wolf_chat.open_chat()
         self.first_death = role.Player()
-        self.day_thread.create_thread(f"{self.game_title} Day {self.night}", self.day_post())
-        self.day_thread.lock_thread()
-        self.day_thread.stick_thread()
+        self.to_skip = []
         if self.night == 1:
+            self.day_thread.create_thread(f"{self.game_title} Day {self.night}", self.day_post())
+            self.day_thread.lock_thread()
+            self.day_thread.stick_thread()
             # get noun list
             # Set up dead forum with Mark
             self.mark_pm.create_conversation("New Wolf game", r'''Hi Mark,
@@ -1090,7 +1094,10 @@ Winning Conditions:
                               insti_text)
                 insti_chat = tc.Chat()
                 insti_chat.create_conversation("Instigators Chat", insti_text, instigators)
-
+        else:
+            self.day_thread.write_post(f"Night actions please. The next day will start at "
+                                       f"[TIME=datetime]{self.night_close_tm.strftime('%Y-%m-%dT%H:%M:%S-0500')}"
+                                       f"[/TIME] unless skipped.")
         # Set up Jailer/Warden Chat
         self.jailed = []
         self.jailer = 0  # is gamenum
@@ -1131,7 +1138,10 @@ Winning Conditions:
 
         # Iterate through all players to initialize game
         for player in self.role_dictionary:
+            self.role_dictionary[player].skipped = False
             self.role_dictionary[player].current_thread = self.day_thread
+            if self.role_dictionary[player].alive:
+                self.to_skip.append(self.role_dictionary[player])
             if self.night == 1:
                 self.role_dictionary[player].chat.create_conversation(f"{self.game_title} Role",
                                                                       self.role_dictionary[player].initial_PM + '\n\n' +
@@ -1313,7 +1323,6 @@ Winning Conditions:
 
     def start_day(self):
         self.death = False
-        self.day_thread.unlock_thread()
         self.day_open_tm = datetime.datetime.now()
         self.manual_votes = []
         self.confusion_in_effect = False
@@ -1321,8 +1330,12 @@ Winning Conditions:
         # check if Cupid / Wolf Chat open
         is_alpha = False
         cult = []
+        self.to_skip = []
         for player in self.role_dictionary:
             self.role_dictionary[player].night += 1
+            self.role_dictionary[player].skipped = False
+            if self.role_dictionary[player].alive:
+                self.to_skip.append(self.role_dictionary[player])
             if self.role_dictionary[player].role == 'Cupid':
                 self.cupid = self.role_dictionary[player]
             if self.role_dictionary[player].shadow:
@@ -1448,7 +1461,9 @@ Winning Conditions:
                                                                 "the day unless the Infector is killed.")
         self.day_thread.create_poll(alive)
         if self.new_thread_text == '':
-            self.new_thread_text = 'Nothing happened last night.'
+            self.new_thread_text = 'Nothing happened last night.\n\n'
+        self.new_thread_text = self.new_thread_text + (f"The day will end at [TIME=datetime]"
+                                                       f"{self.day_close_tm.strftime('%Y-%m-%dT%H:%M:%S-0500')}[/TIME]")
         self.day_thread.write_post(self.new_thread_text)
         self.day_close_tm = self.day_open_tm + datetime.timedelta(hours=24)
         self.output_data()
@@ -1458,6 +1473,7 @@ Winning Conditions:
 
     def end_day(self):
         poll_results = {}
+        self.day_thread.lock_thread()
         if not self.shadow_in_effect:
             # Run Preacher check to see if there are any more votes out there
             self.phased_actions(['Preacher'])
@@ -1504,7 +1520,7 @@ Winning Conditions:
         top_vote = pandas_structure['Vote Count'].max()
         vote_winners = pandas_structure[pandas_structure['Vote Count'] == top_vote]
         for player in self.role_dictionary:
-            if self.role_dictionary[player].screenname == vote_winners[0]:
+            if self.role_dictionary[player].screenname == vote_winners.iloc[0, 0]:
                 vote_winner = self.role_dictionary[player]
                 if len(vote_winners) != 1 or top_vote < lynch_threshold:
                     self.day_thread.write_post("The village could not decide who to lynch.")
@@ -1519,7 +1535,7 @@ Winning Conditions:
                             self.role_dictionary[flower].mp = 0
                             vote_winner.lynchable = True
                 else:
-                    self.kill_player("lynch", role.Player(), vote_winner)
+                    self.day_thread.write_post(self.kill_player("lynched", role.Player(), vote_winner))
         self.win_conditions()
         for player in self.role_dictionary:
             if len(self.role_dictionary[player].infected_by) > 0:
@@ -1550,9 +1566,6 @@ Winning Conditions:
         # Get posts from the thread
         [public_posts, public_posters, public_actions, public_victims, public_times] = (
             self.get_keyword_phrases(pieces, dedupe=False, new=True))
-        for i, post in enumerate(pieces[0]):
-            if pieces[3][i] is False:
-                self.day_thread.seen_post(post)
         if self.cultleader.gamenum > 0:
             cult = []
             [post_ids, posters, posts, reacts, _] = self.cult_chat.convo_pieces()
@@ -1575,11 +1588,11 @@ Winning Conditions:
         for player in self.role_dictionary:
             if self.role_dictionary[player].conjuror is True and player.new_role.role != player.role:
                 self.role_swap(self.role_dictionary[player], player.new_role)
-            pieces = self.role_dictionary[player].chat.convo_pieces()
+            chat_pieces = self.role_dictionary[player].chat.convo_pieces()
             [_, private_posters, private_actions, private_victims, private_times] = (
-                self.get_keyword_phrases(pieces, dedupe=False, new=True))
-            for i, message in enumerate(pieces[0]):
-                if pieces[3][i] is False:
+                self.get_keyword_phrases(chat_pieces, dedupe=False, new=True))
+            for i, message in enumerate(chat_pieces[0]):
+                if chat_pieces[3][i] is False:
                     self.role_dictionary[player].chat.seen_message(message)
             private_post = ["private" for _ in private_times]
             # Combine thread posts and chat posts into one group
@@ -1597,8 +1610,14 @@ Winning Conditions:
         posters = frame['posters'].tolist()
         actions = frame['actions'].tolist()
         victims = frame['victims'].tolist()
+        post_skips = False
+        skip_post = 0
         # Apply actions
         for i, player in enumerate(posters):
+            player.skip_check(actions[i].lower())
+            if actions[i].lower() == 'unskipped' and posts[i] != 'Private':
+                post_skips = True
+                skip_post = posts[i]
             if player.alive and not player.concussed and len(player.corrupted_by) == 0:
                 outcome = player.immediate_action(actions[i].lower(), victims[i])
                 if len(outcome) == 1:
@@ -1630,6 +1649,19 @@ Winning Conditions:
                 if player.role == 'Sorcerer' and player.resigned:
                     self.role_swap(player, role.Werewolf())
                 self.win_conditions()
+        for i, post in enumerate(pieces[0]):
+            if pieces[3][i] is False:
+                self.day_thread.seen_post(post)
+        for player in self.role_dictionary:
+            if self.role_dictionary[player].skipped and self.role_dictionary[player] in self.to_skip:
+                del self.to_skip[self.to_skip.index(self.role_dictionary[player])]
+        if len(self.to_skip) == 0:
+            self.day_close_tm = datetime.datetime.now()
+        if post_skips:
+            text = self.day_thread.quote_post(skip_post) + "The following players have yet to skip:\n"
+            for unskipped in self.to_skip:
+                text = text + unskipped.screenname + '\n'
+            self.day_thread.write_post(text)
         self.output_data()
 
     def run_night_checks(self):
@@ -1641,9 +1673,11 @@ Winning Conditions:
             for i, message in enumerate(pieces[0]):
                 if pieces[3][i] is False:
                     self.role_dictionary[player].chat.seen_message(message)
-            if (self.role_dictionary[player].alive and not self.role_dictionary[player].jailed
-                    and not self.role_dictionary[player].concussed and not self.role_dictionary[player].nightmared):
-                for i in range(len(actions)):
+            for i in range(len(actions)):
+                self.role_dictionary[player].skip_check(actions[i].lower())
+                if (self.role_dictionary[player].alive and not self.role_dictionary[player].jailed
+                        and not self.role_dictionary[player].concussed and not self.role_dictionary[
+                            player].nightmared):
                     outcome = self.role_dictionary[player].immediate_action(actions[i].lower(), victims[i])
                     if len(outcome) == 3:
                         self.new_thread_text = (
@@ -1651,6 +1685,10 @@ Winning Conditions:
                                 self.day_thread.write_post(self.kill_player(outcome[0], outcome[1], outcome[2])))
             if self.role_dictionary[player].role == 'Sorcerer' and self.role_dictionary[player].resigned:
                 self.role_swap(self.role_dictionary[player], role.Werewolf())
+            if self.role_dictionary[player].skipped and self.role_dictionary[player] in self.to_skip:
+                del self.to_skip[self.to_skip.index(self.role_dictionary[player])]
+        if len(self.to_skip) == 0:
+            self.night_close_tm = datetime.datetime.now()
         self.output_data()
 
     def kill_player(self, method, killer, victim):
@@ -1667,6 +1705,12 @@ Winning Conditions:
                 del victim.jellied_by[victim.jellied_by.index(jellier)]
                 jellier.chat.write_message(f"Your protection on {victim.screenname} has been consumed.")
             return 'The Jelly Wolf protection has been consumed.'
+        if victim.role == 'Werewolf Fan' and method in ['wolf', 'toxic']:
+            self.role_swap(victim, role.Werewolf())
+            victim.chat.write_message("You have been bitten! You have been converted to a Werewolf.")
+            self.wolf_chat.close_chat()
+            self.create_wolf_chat()
+            return ''
         if victim.role == 'Alpha Wolf' and victim.extra_life:
             victim.extra_list = False
             return 'The Alpha Wolf has been attacked.'
@@ -1678,6 +1722,8 @@ Winning Conditions:
             del victim.scribed_by[-1]  # Clean up
         # Victim gets most attributes reset
         victim.alive = False
+        if victim in self.to_skip:
+            del self.to_skip[self.to_skip.index(victim)]
         self.death = True
         victim.doused_by = []
         victim.disguised_by = []
@@ -1858,12 +1904,6 @@ Winning Conditions:
                 delindex = victim.acting_upon[0].tricked_by.index(victim)
                 del victim.acting_upon[0].tricked_by[delindex]
                 victim.acting_upon = []
-        elif victim.role == 'Werewolf Fan' and method in ['wolf', 'toxic']:
-            self.role_swap(victim, role.Werewolf())
-            victim.chat.write_message("You have been bitten! You have been converted to a Werewolf.")
-            self.wolf_chat.close_chat()
-            self.create_wolf_chat()
-            return ''
         elif victim.role == 'Arsonist':
             for doused in victim.acting_upon:
                 delindex = doused.doused_by.index(victim)
@@ -1900,159 +1940,160 @@ Winning Conditions:
                     wolves_left.append(self.role_dictionary[player])
             if len(wolves_left) == 1:
                 wolves_left[0].is_last_evil = True
-        # remove player from poll
-        self.day_thread.change_poll_item(victim.screenname, '')
+        if self.day_thread.open:
+            # remove player from poll
+            self.day_thread.change_poll_item(victim.screenname, '')
         self.mark_pm.write_message(f"Can you add {victim.screenname} please?")
         # Go through and print messages for each death method
         if method == 'lynched':
             self.output_data()
             return (f"[b]{victim.screenname}[/b] was lynched by the village. "
-                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
+                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n\n" + secondary_text)
         elif method == 'rock':
             self.output_data()
             return (f'[b]{victim.screenname}[/b] was hit by a rock and killed after being concussed. '
-                    f'{killer.screenname} is the [b]Bully[/b].\n[b]{victim.screenname}[/b] is dead.'
-                    f' {victim.screenname} was the [b]{victim.apparent_role}[/b].\n' + secondary_text)
+                    f'{killer.screenname} is the [b]Bully[/b].\n\n[b]{victim.screenname}[/b] is dead.'
+                    f' {victim.screenname} was the [b]{victim.apparent_role}[/b].\n\n' + secondary_text)
         elif method == 'jailer':
             killer.has_killed = True
             self.output_data()
             return (f"[b]{victim.screenname}[/b] was killed in jail. "
-                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
+                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n\n" + secondary_text)
         elif method == 'prisoner':
             killer.has_killed = True
             self.output_data()
             return (f"[b]{victim.screenname}[/b] was killed by a fellow prisoner in jail. "
-                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
+                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n\n" + secondary_text)
         elif method == 'gunner':
             self.output_data()
             return (f'[b]{killer.screenname}[/b] has shot and killed [b]{victim.screenname}[/b]. '
-                    f'{killer.screenname} is the [b]Gunner[/b].\n{victim.screenname} is dead. '
-                    f'{victim.screenname} was the [b]{victim.apparent_role}[/b].\n' + secondary_text)
+                    f'{killer.screenname} is the [b]Gunner[/b].\n\n{victim.screenname} is dead. '
+                    f'{victim.screenname} was the [b]{victim.apparent_role}[/b].\n\n' + secondary_text)
         elif method == 'shot':
             self.output_data()
             return (f"[b]{victim.screenname}[/b] was shot and killed. "
-                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
+                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n\n" + secondary_text)
         elif method == 'avenger':
             self.output_data()
             return (f"The avenger has taken their revenge and killed [b]{victim.screenname}[/b]. "
-                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
+                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n\n" + secondary_text)
         elif method == 'trap':
             killer.has_killed = True
             self.output_data()
             return (f"[b]{victim.screenname}[/b] was killed by the Beast Hunter's trap. "
-                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
+                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n\n" + secondary_text)
         elif method == 'marksman':
             killer.has_killed = True
             self.output_data()
             return (f"[b]{victim.screenname}[/b] was shot and killed by the marksman. "
-                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
+                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n\n" + secondary_text)
         elif method == 'misfire':
             self.output_data()
             return (f'{killer.screenname} was shot by the marksman and lived. '
                     f'[b]{victim.screenname}[/b] was killed by their own arrow. '
-                    f'{victim.screenname} was the [b]{victim.apparent_role}[/b].\n' + secondary_text)
+                    f'{victim.screenname} was the [b]{victim.apparent_role}[/b].\n\n' + secondary_text)
         elif method == 'water':
             self.output_data()
             return (f"[b]{victim.screenname}[/b] was killed by holy water. "
-                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
+                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n\n" + secondary_text)
         elif method == 'drowned':
             self.output_data()
             return (f"[b]{victim.screenname}[/b] killed themselves attempting to water {killer.screenname}. "
-                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
+                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n\n" + secondary_text)
         elif method == 'witch':
             killer.has_killed = True
             self.output_data()
             return (f"[b]{victim.screenname}[/b] was killed by the Witch. "
-                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
+                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n\n" + secondary_text)
         elif method == 'wolf':
             self.output_data()
             return (f"[b]{victim.screenname}[/b] was killed by the werewolves. "
-                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
+                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n\n" + secondary_text)
         elif method == 'berserk':
             self.output_data()
             return (f"[b]{victim.screenname}[/b] was caught up in the werewolf berserk frenzy. "
-                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
+                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n\n" + secondary_text)
         elif method == 'toxic':
             self.output_data()
             return (f"[b]{victim.screenname}[/b] was killed after being poisoned by the werewolves. "
-                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
+                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n\n" + secondary_text)
         elif method == 'alchemist':
             self.output_data()
             return (f"[b]{victim.screenname}[/b] was killed by the Alchemist. "
-                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
+                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n\n" + secondary_text)
         elif method == 'arsonist':
             killer.has_killed = True
             self.output_data()
             return (f"[b]{victim.screenname}[/b] was killed in the fire. "
-                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
+                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n\n" + secondary_text)
         elif method == 'corruptor':
             victim.corrupted_by = [0]
             self.output_data()
             return (f"[b]{victim.screenname}[/b] was killed by the Corruptor. "
-                    f"{victim.screenname} was the [b]??????[/b].\n" + secondary_text)
+                    f"{victim.screenname} was the [b]??????[/b].\n\n" + secondary_text)
         elif method == 'sacrificed':
             killer.has_killed = True
             self.output_data()
             return (f"[b]{victim.screenname}[/b] was sacrificed by the Cult Leader. "
-                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
+                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n\n" + secondary_text)
         elif method == 'cult':
             killer.has_killed = True
             self.output_data()
             return (f"[b]{victim.screenname}[/b] was attacked by the Cult Leader. "
-                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
+                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n\n" + secondary_text)
         elif method == 'illusionist':
             self.output_data()
             return (f"[b]{victim.screenname}[/b] was killed by the Illusionist. "
-                    f"{victim.screenname} was the [b]Illusionist[/b].\n" + secondary_text)
+                    f"{victim.screenname} was the [b]Illusionist[/b].\n\n" + secondary_text)
         elif method == 'infector':
             self.output_data()
             return (f"[b]{victim.screenname}[/b] was killed by the Infector. "
-                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
+                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n\n" + secondary_text)
         elif method == 'detective':
             killer.has_killed = True
             self.output_data()
             return (f"[b]{victim.screenname}[/b] was killed by the Evil Detective. "
-                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
+                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n\n" + secondary_text)
         elif method == 'instigator':
             killer.has_killed = True
             self.output_data()
             return (f"[b]{victim.screenname}[/b] was killed by the Instigator. "
-                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
+                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n\n" + secondary_text)
         elif method == 'stabbed':
             killer.has_killed = True
             self.output_data()
             return (f"[b]{victim.screenname}[/b] was killed by the Serial Killer. "
-                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
+                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n\n" + secondary_text)
         elif method == 'coupled':
             self.output_data()
             return (f"[b]{victim.screenname}[/b] is devastated by the loss of a person very close to them, "
                     f"and took their own life. {victim.screenname} was the "
-                    f"[b]{victim.apparent_role}[/b].\n" + secondary_text)
+                    f"[b]{victim.apparent_role}[/b].\n\n" + secondary_text)
         elif method == 'breakout':
             self.output_data()
             return (f"[b]{victim.screenname}[/b] was killed by the werewolves breaking out of jail. "
-                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
+                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n\n" + secondary_text)
         elif method == 'judge':
             self.output_data()
             return (f"[b]{victim.screenname}[/b] was rightfully killed by the Judge carrying out Justice. "
-                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
+                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n\n" + secondary_text)
         elif method == 'mistrial':
             self.output_data()
             return (f'[b]{victim.screenname}[/b] was killed by townspeople after attempting to condemn '
-                    f'{killer.screenname} to an innocent death.\n'
-                    f'{victim.screenname} was the [b]{victim.apparent_role}[/b].\n' + secondary_text)
+                    f'{killer.screenname} to an innocent death.\n\n'
+                    f'{victim.screenname} was the [b]{victim.apparent_role}[/b].\n\n' + secondary_text)
         elif method == 'evilvisit':
             self.output_data()
             return (f"[b]{victim.screenname}[/b] killed visiting a killer. "
-                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
+                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n\n" + secondary_text)
         elif method == 'poorvisit':
             self.output_data()
             return (f"[b]{victim.screenname}[/b] was attacked while visiting a player. "
-                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
+                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n\n" + secondary_text)
         elif method == 'tough':
             self.output_data()
             return (f"[b]{victim.screenname}[/b] died from their previously sustained injuries. "
-                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n" + secondary_text)
+                    f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n\n" + secondary_text)
         return ''
 
     def win_conditions(self, trigger='None'):
@@ -2124,7 +2165,8 @@ Winning Conditions:
                       'global_rv', 'global_rk', 'day_thread', 'jailer_chat', 'jailee_chat', 'jailed', 'jailer',
                       'day_open_tm', 'day_close_tm', 'alch_deaths_tm', 'first_death', 'couple', 'cupid',
                       'instigator', 'confusion_in_effect', 'manual_votes', 'shadow_in_effect', 'shadow_available',
-                      'tie_count', 'death', 'game_over', 'night_close_tm', 'night_open_tm', 'cult_chat', 'cultleader']
+                      'tie_count', 'death', 'game_over', 'night_close_tm', 'night_open_tm', 'cult_chat', 'cultleader',
+                      'to_skip']
         # output master data to csv
         self.master_data.to_csv(f"{output_dir + self.game_title}.csv", index=False)
         # output game attributes to a text file

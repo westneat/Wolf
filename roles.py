@@ -178,6 +178,7 @@ class Player:
         self.lynchable = True
         self.scribe_method = []
         self.scribed_by = []
+        self.skipped = False
         # Forger
         self.guns_forged = 0
         self.shields_forged = 0
@@ -232,6 +233,11 @@ class Player:
             return ['shoot', self, victims[0]]
         return []
 
+    def skip_check(self, keyword):
+        if keyword == 'skip':
+            self.skipped = True
+        return []
+
 
 # Strong Villagers
 class Bully(Player):
@@ -267,8 +273,11 @@ class Bully(Player):
             if victims[0].has_been_concussed:
                 return ['rock', self, victims[0]]
             else:
-                victims.concussed = True
-                victims.has_been_concussed = True
+                victims[0].chat.write_message("You've been hit by a rock and are now concussed. "
+                                              "You cannot use any actions until the next day phase, "
+                                              "and will die if struck again. ")
+                victims[0].concussed = True
+                victims[0].has_been_concussed = True
         return []
 
 
@@ -984,7 +993,7 @@ class Judge(Player):
     def phased_action(self, keyword, victims):
         if (keyword == 'judge' and len(victims) == 1 and victims[0].alive and self.mp >= 50
                 and victims[0].gamenum != self.gamenum
-                and self.current_thread.open):
+                and not self.current_thread.open):
             self.mp = self.mp-50
             if victims[0].team == 'Village':
                 return ['mistrial', self, self]
