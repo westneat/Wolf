@@ -286,6 +286,8 @@ class Thread:
             "poll[close]": "1",
             "poll[close_length]": "24",
             "poll[close_units]": "hours",
+            "poll[change_vote]": "True",
+            "poll[view_results_unvoted]": "True",
             }
         requests.post(api_url, headers=self.headers, data=payload)
 

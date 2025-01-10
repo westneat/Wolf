@@ -106,9 +106,6 @@ class Player:
         self.team = 'Village'
         self.mp = 100
         self.screenname = ''
-        self.apparent_role = self.role
-        self.apparent_team = self.team
-        self.apparent_aura = self.aura
         self.acting_upon = []
         self.last_thread_id = 0
         self.chat = tc.Chat()
@@ -208,7 +205,7 @@ class Player:
         self.has_protect_potion = False
         self.has_kill_potion = False
         # Cupid
-        self.night = 0
+        self.night = 1
         # Headhunter
         self.target_name = ''
         # Instigator
@@ -246,6 +243,9 @@ class Bully(Player):
         self.gamenum = gamenum
         self.noun = noun
         self.category = 'Strong Villager'
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the day by posting [b]here[/b]:
 
@@ -284,6 +284,9 @@ class Conjuror(Player):
         self.role = 'Conjuror'
         self.new_role = self
         self.category = 'Strong Villager'
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the day by posting [b]here[/b]:
 
@@ -310,6 +313,9 @@ class Detective(Player):
         self.seer = True
         self.role = 'Detective'
         self.category = 'Strong Villager'
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
@@ -320,7 +326,8 @@ class Detective(Player):
                 victims[0].gamenum != self.gamenum and victims[1].gamenum != self.gamenum
                 and victims[0].gamenum != victims[1].gamenum and not self.current_thread.open):
             self.chat.write_message(
-                f"You are checking {victims[0].screenname} and {victims[1].screenname} at the end of the night.")
+                f"You are checking {victims[0].screenname if self.night > 1 else victims[0].noun} and "
+                f"{victims[1].screenname if self.night > 1 else victims[1].noun} at the end of the night.")
         return []
 
     def phased_action(self, keyword, victims):
@@ -356,6 +363,9 @@ class Gunner(Player):
         self.noun = noun
         self.hhtargetable = False
         self.category = 'Strong Villager'
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the day by posting [b]in the day thread[/b]:
 
@@ -383,6 +393,9 @@ class Jailer(Player):
         self.noun = noun
         self.role = 'Jailer'
         self.category = 'Strong Villager'
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the day by posting [b]here[/b]:
 
@@ -425,6 +438,9 @@ class Medium(Player):
         self.noun = noun
         self.role = 'Medium'
         self.category = 'Strong Villager'
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
@@ -457,6 +473,9 @@ class Ritualist(Player):
         self.noun = noun
         self.role = 'Ritualist'
         self.category = 'Strong Villager'
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the day or night by posting [b]here[/b]:
 
@@ -465,7 +484,8 @@ class Ritualist(Player):
     def immediate_action(self, keyword, victims):
         if (keyword == 'spell' and len(victims) == 1 and victims[0].alive
                 and self.mp == 100):
-            self.chat.write_message(f"{victims[0].screenname} has the revival spell cast upon them.")
+            self.chat.write_message(f"{victims[0].screenname if self.night > 1 else victims[0].noun}"
+                                    f" has the revival spell cast upon them.")
             victims[0].spelled = True
         return []
 
@@ -480,6 +500,9 @@ class Warden(Player):
         self.noun = noun
         self.role = 'Warden'
         self.category = 'Strong Villager'
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the day by posting [b]here[/b]:
 
@@ -535,6 +558,9 @@ class AuraSeer(Player):
         self.gamenum = gamenum
         self.noun = noun
         self.seer = True
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
@@ -543,8 +569,8 @@ class AuraSeer(Player):
     def immediate_action(self, keyword, victims):
         if (keyword == 'check' and len(victims) == 1 and victims[0].alive
                 and victims[0].gamenum != self.gamenum and not self.current_thread.open):
-            self.chat.write_message(f"You are checking {victims[0].screenname} and "
-                                    f"{victims[1].screenname} at the end of the night.")
+            self.chat.write_message(f"You are checking {victims[0].screenname if self.night > 1 else victims[0].noun} "
+                                    f"at the end of the night.")
         return []
 
     def phased_action(self, keyword, victims):
@@ -567,6 +593,9 @@ class Avenger(Player):
         self.screenname = screenname
         self.gamenum = gamenum
         self.noun = noun
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
@@ -575,7 +604,8 @@ class Avenger(Player):
     def immediate_action(self, keyword, victims):
         if (keyword == 'tag' and len(victims) == 1 and victims[0].alive
                 and victims[0].gamenum != self.gamenum):
-            self.chat.write_message(f"You are currently avenging upon {victims[0].screenname}.")
+            self.chat.write_message(f"You are currently avenging upon "
+                                    f"{victims[0].screenname if self.night > 1 else victims[0].noun}.")
             self.acting_upon.append(victims[0])
         return []
 
@@ -595,6 +625,9 @@ class BeastHunter(Player):
         self.noun = noun
         self.trap_on = 0
         self.aura = 'Unknown'
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
@@ -603,7 +636,8 @@ class BeastHunter(Player):
     def immediate_action(self, keyword, victims):
         if (keyword == 'trap' and len(victims) == 1 and victims[0].alive
                 and not self.current_thread.open and victims[0].gamenum != self.trap_on):
-            self.chat.write_message(f"Tonight you will move your trap to {victims[0].screenname}.")
+            self.chat.write_message(f"Tonight you will move your trap to "
+                                    f"{victims[0].screenname if self.night > 1 else victims[0].noun}.")
         return []
 
     def phased_action(self, keyword, victims):
@@ -622,6 +656,9 @@ class BellRinger(Player):
         self.screenname = screenname
         self.gamenum = gamenum
         self.noun = noun
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
@@ -632,8 +669,9 @@ class BellRinger(Player):
                 and victims[0].gamenum != self.gamenum and victims[1].gamenum != self.gamenum
                 and victims[0].gamenum != victims[1].gamenum and self.mp == 100
                 and not self.current_thread.open):
-            self.chat.write_message(f"You will watch {victims[0].screenname} and "
-                                    f"{victims[1].screenname} until the next night phase.")
+            self.chat.write_message(f"You will watch {victims[0].screenname if self.night > 1 else victims[0].noun} "
+                                    f"and {victims[1].screenname if self.night > 1 else victims[1].noun} "
+                                    f"until the next night phase.")
         return []
 
     def phased_action(self, keyword, victims):
@@ -655,6 +693,9 @@ class Bodyguard(Player):
         self.noun = noun
         self.shield = True
         self.protected_by['Bodyguard'] = [self]
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
@@ -662,7 +703,8 @@ class Bodyguard(Player):
 
     def immediate_action(self, keyword, victims):
         if keyword == 'protect' and len(victims) == 1 and victims[0].alive and not self.current_thread.open:
-            self.chat.write_message(f"You will protect {victims[0].screenname} tonight.")
+            self.chat.write_message(f"You will protect {victims[0].screenname if self.night > 1 else victims[0].noun}"
+                                    f" tonight.")
         return []
 
     def phased_action(self, keyword, victims):
@@ -678,6 +720,9 @@ class Defender(Player):
         self.screenname = screenname
         self.gamenum = gamenum
         self.noun = noun
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
@@ -689,8 +734,12 @@ class Defender(Player):
         if (keyword == 'protect' and len(victims) <= self.mp // 16 and are_all_alive(victims)
                 and not self.current_thread.open):
             text = "You will protect the following players tonight: "
-            for i in victims:
-                text = text + f"\n{i.screenname}"
+            if self.night != 1:
+                for i in victims:
+                    text = text + f"\n{i.screenname}"
+            else:
+                for i in victims:
+                    text = text + f"\n{i.noun}"
             self.chat.write_message(text)
         return []
 
@@ -712,6 +761,9 @@ class Doctor(Player):
         self.screenname = screenname
         self.gamenum = gamenum
         self.noun = noun
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
@@ -720,7 +772,7 @@ class Doctor(Player):
     def immediate_action(self, keyword, victims):
         if (keyword == 'protect' and len(victims) == 1 and victims[0].alive
                 and victims[0].gamenum != self.gamenum and not self.current_thread.open):
-            text = f"You will protect {victims[0].screenname} tonight."
+            text = f"You will protect {victims[0].screenname if self.night > 1 else victims[0].noun} tonight."
             self.chat.write_message(text)
         return []
 
@@ -739,6 +791,9 @@ class Farmer(Player):
         self.screenname = screenname
         self.gamenum = gamenum
         self.noun = noun
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b].'''
 
 
@@ -752,6 +807,9 @@ class Flagger(Player):
         self.cooldown = False
         self.aura = 'Unknown'
         self.attacking = 0
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
@@ -763,7 +821,8 @@ class Flagger(Player):
                 and victims[0].gamenum != victims[1].gamenum and not self.current_thread.open and not self.cooldown
                 and self.mp >= 50):
             text = (f"You will redirect all evil attacks from "
-                    f"{victims[0].screenname} towards {victims[1].screenname} tonight.")
+                    f"{victims[0].screenname if self.night > 1 else victims[0].noun} towards "
+                    f"{victims[1].screenname if self.night > 1 else victims[1].noun} tonight.")
             self.chat.write_message(text)
         return []
 
@@ -788,6 +847,9 @@ class FlowerChild(Player):
         self.gamenum = gamenum
         self.noun = noun
         self.hhtargetable = False
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the day by posting [b]here[/b]:
 
@@ -796,7 +858,7 @@ class FlowerChild(Player):
     def immediate_action(self, keyword, victims):
         if (keyword == 'protect' and self.mp == 100 and len(victims) == 1
                 and victims[0].alive and self.current_thread.open):
-            text = f"You are currently saving {victims[0]} from being lynched."
+            text = f"You are currently saving {victims[0].screenname} from being lynched."
             self.chat.write_message(text)
             victims[0].lynchable = False
             self.acting_upon.append(victims[0])
@@ -814,6 +876,9 @@ class Forger(Player):
         self.shields_forged = 0
         self.aura = 'Unknown'
         self.action_used = 0
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
@@ -840,11 +905,11 @@ class Forger(Player):
             self.chat.write_message(text)
         if (keyword == 'arm' and self.gamenum in self.forger_guns and victims[0].alive
                 and len(victims) == 1 and not self.current_thread.open):
-            text = f"You will give the gun to {victims[0]}."
+            text = f"You will give the gun to {victims[0].screenname}."
             self.chat.write_message(text)
         if (keyword == 'arm' and self.gamenum in self.forger_shields and victims[0].alive
                 and len(victims) == 1 and not self.current_thread.open):
-            text = f"You will give the shield to {victims[0]}."
+            text = f"You will give the shield to {victims[0].screenname}."
             self.chat.write_message(text)
         return []
 
@@ -869,7 +934,7 @@ class Forger(Player):
             victims[0].forger_guns.append(self.gamenum)
             # we lose our gun
             self.forger_guns.remove(self.gamenum)
-            text = f"You gave the gun to {victims[0]}."
+            text = f"You gave the gun to {victims[0].screenname}."
             self.chat.write_message(text)
             victims[0].chat.write_message("You have been gifted a gun by the Forger. Use it by writing:\n\n"
                                           "Wolfbot shoot (username)\n\nanytime during the day. If you already have "
@@ -886,7 +951,7 @@ class Forger(Player):
             victims[0].forger_shields.append(self.gamenum)
             # we lose our shield
             self.forger_shields.remove(self.gamenum)
-            text = f"You gave the shield to {victims[0]}."
+            text = f"You gave the shield to {victims[0].screenname}."
             self.chat.write_message(text)
             victims[0].chat.write_message("You have been gifted a shield by the Forger. "
                                           "Use is automatic and requires no action from you.")
@@ -900,6 +965,9 @@ class Judge(Player):
         self.screenname = screenname
         self.gamenum = gamenum
         self.noun = noun
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the day by posting [b]here[/b]:
 
@@ -909,7 +977,7 @@ class Judge(Player):
         if (keyword == 'judge' and len(victims) == 1 and victims[0].alive and self.mp >= 50
                 and victims[0].gamenum != self.gamenum
                 and self.current_thread.open):
-            text = f"You will judge {victims[0]} today if the village cannot decide who to lynch."
+            text = f"You will judge {victims[0].screenname} today if the village cannot decide who to lynch."
             self.chat.write_message(text)
         return []
 
@@ -933,6 +1001,9 @@ class Librarian(Player):
         self.screenname = screenname
         self.gamenum = gamenum
         self.noun = noun
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
@@ -941,7 +1012,7 @@ class Librarian(Player):
     def immediate_action(self, keyword, victims):
         if (keyword == 'mute' and len(victims) == 1 and victims[0].alive and victims[0].gamenum != self.gamenum
                 and not self.current_thread.open):
-            text = f"You will mute {victims[0]} tomorrow."
+            text = f"You will mute {victims[0].screenname if self.night > 1 else victims[0].noun} tomorrow."
             self.chat.write_message(text)
         return []
 
@@ -951,7 +1022,7 @@ class Librarian(Player):
                 and not self.current_thread.open):
             self.acting_upon.append(victims[0].gamenum)
             victims[0].muted_by.append(self.gamenum)
-            text = f"{victims[0]} has been muted."
+            text = f"{victims[0].screenname} has been muted."
             self.chat.write_message(text)
         else:
             self.acting_upon.append(0)
@@ -965,6 +1036,9 @@ class Loudmouth(Player):
         self.screenname = screenname
         self.gamenum = gamenum
         self.noun = noun
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the day or night by posting [b]here[/b]:
 
@@ -973,7 +1047,7 @@ class Loudmouth(Player):
     def immediate_action(self, keyword, victims):
         if (keyword == 'reveal' and len(victims) == 1 and victims[0].alive
                 and victims[0].gamenum != self.gamenum):
-            text = f"You will reveal {victims[0]} upon death."
+            text = f"You will reveal {victims[0].screenname if self.night > 1 else victims[0].noun} upon death."
             self.chat.write_message(text)
             self.acting_upon.append(victims[0])
         return []
@@ -989,6 +1063,9 @@ class Marksman(Player):
         self.gamenum = gamenum
         self.noun = noun
         self.aura = 'Unknown'
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
@@ -1003,7 +1080,7 @@ class Marksman(Player):
     def immediate_action(self, keyword, victims):
         if (keyword == 'mark' and len(victims) == 1 and victims[0].alive and self.mp >= 50
                 and victims[0].gamenum != self.gamenum and not self.current_thread.open):
-            text = f"You will mark {victims[0]} tonight."
+            text = f"You will mark {victims[0].screenname if self.night > 1 else victims[0].noun} tonight."
             self.chat.write_message(text)
         return []
 
@@ -1020,7 +1097,7 @@ class Marksman(Player):
                 and victims[0].gamenum != self.gamenum and not self.current_thread.open):
             self.cooldown = True
             self.acting_upon.append(victims[0])
-            text = f"{victims[0]} is now marked."
+            text = f"{victims[0].screenname} is now marked."
             self.chat.write_message(text)
         return []
 
@@ -1032,6 +1109,9 @@ class Preacher(Player):
         self.screenname = screenname
         self.gamenum = gamenum
         self.noun = noun
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
@@ -1040,7 +1120,7 @@ class Preacher(Player):
     def immediate_action(self, keyword, victims):
         if (keyword == 'watch' and len(victims) == 1 and victims[0].alive
                 and victims[0].gamenum != self.gamenum and not self.current_thread.open):
-            text = f"You will watch {victims[0]} tonight."
+            text = f"You will watch {victims[0].screenname if self.night > 1 else victims[0].noun} tonight."
             self.chat.write_message(text)
         return []
 
@@ -1049,7 +1129,7 @@ class Preacher(Player):
                 and victims[0].gamenum != self.gamenum and not self.current_thread.open):
             self.acting_upon = [victims[0]]
             victims[0].preacher_watched_by.append(self)
-            self.chat.write_message(f"You watched {victims[0]} tonight.")
+            self.chat.write_message(f"You watched {victims[0].screenname} tonight.")
         if (keyword == 'vote' and are_all_alive(victims) and self.current_thread.open
                 and self.votes > 1 and len(victims) <= self.votes):
             return ['vote', victims]
@@ -1069,6 +1149,9 @@ class Priest(Player):
         self.gamenum = gamenum
         self.noun = noun
         self.hhtargetable = False
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the day by posting [b]in the day thread[/b]:
 
@@ -1093,6 +1176,9 @@ class RedLady(Player):
         self.screenname = screenname
         self.gamenum = gamenum
         self.noun = noun
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
@@ -1101,7 +1187,7 @@ class RedLady(Player):
     def immediate_action(self, keyword, victims):
         if (keyword == 'visit' and len(victims) == 1 and victims[0].alive and victims[0].gamenum != self.gamenum
                 and not self.current_thread.open):
-            text = f"You will visit {victims[0]} tonight."
+            text = f"You will visit {victims[0].screenname if self.night > 1 else victims[0].noun} tonight."
             self.chat.write_message(text)
         return []
 
@@ -1109,7 +1195,7 @@ class RedLady(Player):
         if (keyword == 'visit' and len(victims) == 1 and victims[0].alive and victims[0].gamenum != self.gamenum
                 and not self.current_thread.open):
             victims[0].visited.append(self)
-            self.chat.write_message(f"You visited {victims[0]} last night.")
+            self.chat.write_message(f"You visited {victims[0].screenname} last night.")
             if victims[0].is_killer:
                 return ['evilvisit', victims[0], self]
         return []
@@ -1123,6 +1209,9 @@ class Sheriff(Player):
         self.gamenum = gamenum
         self.noun = noun
         self.seer = True
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
@@ -1131,7 +1220,7 @@ class Sheriff(Player):
     def immediate_action(self, keyword, victims):
         if (keyword == 'watch' and len(victims) == 1 and victims[0].alive
                 and victims[0].gamenum != self.gamenum and not self.current_thread.open):
-            text = f"You will watch {victims[0]} tonight."
+            text = f"You will watch {victims[0].screenname if self.night > 1 else victims[0].noun} tonight."
             self.chat.write_message(text)
         return []
 
@@ -1140,7 +1229,7 @@ class Sheriff(Player):
                 and victims[0].gamenum != self.gamenum and not self.current_thread.open):
             self.acting_upon = [victims[0]]
             victims[0].sheriff_watched_by.append(self)
-            self.chat.write_message(f"You watched {victims[0]} tonight.")
+            self.chat.write_message(f"You watched {victims[0].screenname} tonight.")
             if len(victims[0].infected_by) > 0:
                 self.infected_by = victims[0].infected_by.copy()
                 self.chat.write_message(
@@ -1156,6 +1245,9 @@ class SeerApprentice(Player):
         self.gamenum = gamenum
         self.noun = noun
         self.seer_apprentice = True
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b].'''
 
 
@@ -1167,6 +1259,9 @@ class SpiritSeer(Player):
         self.gamenum = gamenum
         self.noun = noun
         self.seer = True
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
@@ -1178,8 +1273,9 @@ class SpiritSeer(Player):
         if (keyword == 'watch' and len(victims) == 2 and victims[0].gamenum != self.gamenum
                 and victims[1].gamenum != self.gamenum and are_all_alive(victims) and
                 victims[0].gamenum != victims[1].gamenum and not self.current_thread.open):
-            self.chat.write_message(f"You are checking {victims[0].screenname} and "
-                                    f"{victims[1].screenname} at the end of the night.")
+            self.chat.write_message(f"You are checking {victims[0].screenname if self.night > 1 else victims[0].noun}"
+                                    f" and {victims[1].screenname if self.night > 1 else victims[1].noun}"
+                                    f" at the end of the night.")
         if (keyword == 'watch' and len(victims) == 1 and victims[0].gamenum != self.gamenum and victims[0].alive
                 and not self.current_thread.open):
             self.chat.write_message(f"You are checking {victims[0].screenname} at the end of the night.")
@@ -1233,6 +1329,9 @@ class ToughGuy(Player):
         self.shield = True
         self.triggered = False
         self.protected_by['Tough Guy'] = [self]
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
@@ -1241,7 +1340,8 @@ class ToughGuy(Player):
     def immediate_action(self, keyword, victims):
         if (keyword == 'protect' and len(victims) == 1 and victims[0].alive
                 and victims[0].gamenum != self.gamenum and not self.current_thread.open):
-            self.chat.write_message(f"You will protect {victims[0].screenname} tonight.")
+            self.chat.write_message(f"You will protect {victims[0].screenname if self.night > 1 else victims[0].noun}"
+                                    f" tonight.")
         return []
 
     def phased_action(self, keyword, victims):
@@ -1260,6 +1360,9 @@ class Violinist(Player):
         self.gamenum = gamenum
         self.noun = noun
         self.seer = True
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
@@ -1307,6 +1410,9 @@ class Witch(Player):
         self.aura = 'Unknown'
         self.has_protect_potion = True
         self.has_kill_potion = True
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
@@ -1321,10 +1427,12 @@ class Witch(Player):
     def immediate_action(self, keyword, victims):
         if (keyword == 'protect' and len(victims) == 1 and victims[0].alive and victims[0].gamenum != self.gamenum
                 and self.has_protect_potion and not self.current_thread.open):
-            self.chat.write_message(f"You will attempt to protect {victims[0].screenname} tonight")
+            self.chat.write_message(f"You will attempt to protect "
+                                    f"{victims[0].screenname if self.night > 1 else victims[0].noun} tonight")
         if (keyword == 'poison' and len(victims) == 1 and victims[0].alive and victims[0].gamenum != self.gamenum
                 and self.has_kill_potion and not self.current_thread.open):
-            self.chat.write_message(f"You will kill {victims[0].screenname} tonight")
+            self.chat.write_message(f"You will kill {victims[0].screenname if self.night > 1 else victims[0].noun}"
+                                    f" tonight")
         return []
 
     def phased_action(self, keyword, victims):
@@ -1358,6 +1466,9 @@ class WolfAvenger(Player):
         self.waterable = True
         self.mm_killable = True
         self.category = 'Werewolf'
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the day or night by posting [b]here[/b]:
 
@@ -1366,7 +1477,8 @@ class WolfAvenger(Player):
     def immediate_action(self, keyword, victims):
         if (keyword == 'tag' and len(victims) == 1 and victims[0].alive
                 and victims[0].wolf_targetable):
-            self.chat.write_message(f"You are currently avenging upon {victims[0].screenname}.")
+            self.chat.write_message(f"You are currently avenging upon "
+                                    f"{victims[0].screenname if self.night > 1 else victims[0].noun}.")
             self.acting_upon.append(victims[0])
         return []
 
@@ -1399,6 +1511,9 @@ class Werewolf(Player):
         self.waterable = True
         self.mm_killable = True
         self.category = 'None'
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b].'''
 
     def get_shadow_vote(self, keyword, voted):
@@ -1425,6 +1540,9 @@ class ShamanWolf(Player):
         self.waterable = True
         self.mm_killable = True
         self.category = 'Werewolf'
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time [b]during the day[/b] by posting [b]here[/b]:
 
@@ -1433,7 +1551,8 @@ class ShamanWolf(Player):
     def immediate_action(self, keyword, victims):
         if (keyword == 'shaman' and len(victims) == 1 and victims[0].alive
                 and victims[0].wolf_targetable and not self.is_last_evil):
-            self.chat.write_message(f"You will enchant {victims[0].screenname} tonight.")
+            self.chat.write_message(f"You will enchant {victims[0].screenname if self.night > 1 else victims[0].noun}"
+                                    f" tonight.")
         return []
 
     def phased_action(self, keyword, victims):
@@ -1468,6 +1587,9 @@ class BerserkWolf(Player):
         self.waterable = True
         self.mm_killable = True
         self.category = 'Werewolf'
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the day or night by posting [b]here[/b]:
 
@@ -1477,7 +1599,8 @@ class BerserkWolf(Player):
         if keyword == 'berserk' and self.mp == 100 and not self.current_thread.open:
             text = r"Berserk will be activated tonight."
             if len(victims) > 0:
-                text = text + f" You will need to vote {victims[0].screenname} in the normal wolf vote."
+                text = text + (f" You will need to vote {victims[0].screenname if self.night > 1 else victims[0].noun}"
+                               f" in the normal wolf vote.")
             self.chat.write_message(text)
         return []
 
@@ -1515,6 +1638,9 @@ class NightmareWolf(Player):
         self.waterable = True
         self.mm_killable = True
         self.category = 'Werewolf'
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the day by posting [b]here[/b]:
 
@@ -1558,6 +1684,9 @@ class VoodooWolf(Player):
         self.waterable = True
         self.mm_killable = True
         self.category = 'Werewolf'
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
@@ -1566,7 +1695,7 @@ class VoodooWolf(Player):
     def immediate_action(self, keyword, victims):
         if (keyword == 'mute' and len(victims) == 1 and victims[0].alive
                 and victims[0].wolf_targetable and not self.current_thread.open):
-            text = f"You will mute {victims[0]} tomorrow."
+            text = f"You will mute {victims[0].screenname if self.night > 1 else victims[0].noun} tomorrow."
             self.chat.write_message(text)
         return []
 
@@ -1575,7 +1704,7 @@ class VoodooWolf(Player):
                 and victims[0].wolf_targetable and not self.current_thread.open):
             self.acting_upon.append(victims[0].gamenum)
             victims[0].muted_by.append(self.gamenum)
-            text = f"{victims[0]} has been muted."
+            text = f"{victims[0].screenname} has been muted."
             self.chat.write_message(text)
         else:
             self.acting_upon.append(0)
@@ -1605,6 +1734,9 @@ class GuardianWolf(Player):
         self.waterable = True
         self.mm_killable = True
         self.category = 'Werewolf'
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the day by posting [b]here[/b]:
 
@@ -1613,7 +1745,7 @@ class GuardianWolf(Player):
     def immediate_action(self, keyword, victims):
         if (keyword == 'protect' and self.mp == 100 and len(victims) == 1
                 and victims[0].alive and self.current_thread.open):
-            text = f"You are currently saving {victims[0]} from being lynched."
+            text = f"You are currently saving {victims[0].screenname} from being lynched."
             victims[0].lynchable = False
             self.acting_upon.append(victims[0])
             self.chat.write_message(text)
@@ -1643,6 +1775,9 @@ class WolfTrickster(Player):
         self.waterable = True
         self.mm_killable = True
         self.category = 'Werewolf'
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the day or night by posting [b]here[/b]:
 
@@ -1651,7 +1786,7 @@ class WolfTrickster(Player):
     def immediate_action(self, keyword, victims):
         if (keyword == 'trick' and self.mp == 100 and len(victims) == 1
                 and victims[0].alive and victims[0].wolf_targetable):
-            text = f"You are currently tricking {victims[0]}."
+            text = f"You are currently tricking {victims[0].screenname if self.night > 1 else victims[0].noun}."
             self.chat.write_message(text)
             self.acting_upon.append(victims[0])
             victims[0].tricked_by.append(self)
@@ -1682,6 +1817,9 @@ class ConfusionWolf(Player):
         self.confusion = False
         self.mm_killable = True
         self.category = 'Werewolf'
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
@@ -1691,7 +1829,8 @@ class ConfusionWolf(Player):
         if keyword == 'confusion' and self.mp >= 50 and not self.current_thread.open:
             text = r"Confusion will be activated tonight."
             if len(victims) == 1:
-                text = text + f"You will need to vote {victims[0].screenname} in the normal wolf vote."
+                text = text + (f"You will need to vote {victims[0].screenname if self.night > 1 else victims[0].noun}"
+                               f" in the normal wolf vote.")
             self.chat.write_message(text)
         return []
 
@@ -1730,6 +1869,9 @@ class ShadowWolf(Player):
         self.waterable = True
         self.mm_killable = True
         self.category = 'Werewolf'
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the day by posting [b]here[/b]:
 
@@ -1775,6 +1917,9 @@ class JellyWolf(Player):
         self.waterable = True
         self.mm_killable = True
         self.category = 'Werewolf'
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
@@ -1783,7 +1928,8 @@ class JellyWolf(Player):
     def immediate_action(self, keyword, victims):
         if (keyword == 'protect' and self.mp == 100 and len(victims) == 1
                 and victims[0].alive and not self.current_thread.open):
-            text = f"You will attempt to place jelly on {victims[0]} tonight."
+            text = (f"You will attempt to place jelly on {victims[0].screenname if self.night > 1 else victims[0].noun}"
+                    f" tonight.")
             self.chat.write_message(text)
         return []
 
@@ -1792,7 +1938,7 @@ class JellyWolf(Player):
                 and victims[0].alive and not self.current_thread.open):
             victims[0].jellied_by.append(self)
             self.acting_upon = [victims[0]]
-            self.chat.write_message(f"You placed protective jelly on {victims[0]} last night.")
+            self.chat.write_message(f"You placed protective jelly on {victims[0].screenname} last night.")
         return []
 
     def get_shadow_vote(self, keyword, voted):
@@ -1819,6 +1965,9 @@ class ToxicWolf(Player):
         self.waterable = True
         self.mm_killable = True
         self.category = 'Werewolf'
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the day by posting [b]here[/b]:
 
@@ -1856,6 +2005,9 @@ class WolfScribe(Player):
         self.waterable = True
         self.mm_killable = True
         self.category = 'Werewolf'
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
@@ -1870,7 +2022,8 @@ class WolfScribe(Player):
         methods = kill_methods()['keyword']
         if (keyword == 'kill' and self.mp >= 50 and len(victims) == 2 and victims[0].alive
                 and victims[1] in methods):
-            text = f"If {victims[0]} dies, they will be shown as having been killed by the following method: \n"
+            text = (f"If {victims[0].screenname if self.night > 1 else victims[0].noun}"
+                    f" dies, they will be shown as having been killed by the following method: \n")
             text = text + kill_methods()['Cause of Death'][kill_methods()['keyword'].index(victims[1])]
             self.chat.write_message(text)
             self.acting_upon = [victims[0]]
@@ -1905,6 +2058,9 @@ class AlphaWolf(Player):
         self.waterable = True
         self.mm_killable = True
         self.category = 'Werewolf'
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b].'''
 
     def get_shadow_vote(self, keyword, voted):
@@ -1930,6 +2086,9 @@ class BlindWolf(Player):
         self.waterable = True
         self.mm_killable = True
         self.category = 'Werewolf'
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
@@ -1945,8 +2104,10 @@ class BlindWolf(Player):
         if (keyword == 'check' and len(victims) == 2 and are_all_alive(victims) and victims[0].wolf_targetable
                 and victims[1].wolf_targetable and self.checked < 2 and not self.resigned
                 and not self.current_thread.open and not self.jailed and not self.concussed):
-            self.chat.write_message(f"{victims[0].screenname} is the {victims[0].category}. "
-                                    f"{victims[1].screenname} is the {victims[1].category}.")
+            self.chat.write_message(f"{victims[0].screenname if self.night > 1 else victims[0].noun} "
+                                    f"is the {victims[0].category}. "
+                                    f"{victims[1].screenname if self.night > 1 else victims[1].noun} "
+                                    f"is the {victims[1].category}.")
             self.checked = 2
             if len(victims[0].infected_by) > 0:
                 self.infected_by = victims[0].infected_by.copy()
@@ -1959,7 +2120,8 @@ class BlindWolf(Player):
         if (keyword == 'check' and len(victims) == 1 and victims[0].alive and victims[0].wolf_targetable
                 and self.checked < 2 and not self.resigned and not self.current_thread.open and not self.jailed
                 and not self.concussed):
-            self.chat.write_message(f"{victims[0].screenname} is the {victims[0].category}.")
+            self.chat.write_message(f"{victims[0].screenname if self.night > 1 else victims[0].noun}"
+                                    f" is the {victims[0].category}.")
             self.checked = self.checked + 1
             if len(victims[0].infected_by) > 0:
                 self.infected_by = victims[0].infected_by.copy()
@@ -1994,6 +2156,9 @@ class WolfSeer(Player):
         self.waterable = True
         self.mm_killable = True
         self.category = 'Werewolf'
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
@@ -2007,7 +2172,8 @@ class WolfSeer(Player):
         if (keyword == 'check' and len(victims) == 1 and victims[0].alive
                 and victims[0].wolf_targetable and self.checked == 0 and not self.resigned
                 and not self.current_thread.open and not self.jailed and not self.concussed):
-            self.chat.write_message(f"{victims[0].screenname} is the {victims[0].role}.")
+            self.chat.write_message(f"{victims[0].screenname if self.night > 1 else victims[0].noun}"
+                                    f" is the {victims[0].role}.")
             self.checked = self.checked + 1
             if len(victims[0].infected_by) > 0:
                 self.infected_by = victims[0].infected_by.copy()
@@ -2042,6 +2208,9 @@ class Sorcerer(Player):
         self.wolf_targetable = False
         self.mm_killable = True
         self.category = 'None'
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
@@ -2059,7 +2228,8 @@ class Sorcerer(Player):
         if (keyword == 'check' and len(victims) == 1 and victims[0].alive
                 and victims[0].wolf_targetable and self.checked == 0 and not self.resigned
                 and not self.current_thread.open and not self.jailed and not self.concussed):
-            self.chat.write_message(f"{victims[0].screenname} is the {victims[0].role}.")
+            self.chat.write_message(f"{victims[0].screenname if self.night > 1 else victims[0].noun}"
+                                    f" is the {victims[0].role}.")
             self.checked = self.checked + 1
             if len(victims[0].infected_by) > 0:
                 self.infected_by = victims[0].infected_by.copy()
@@ -2083,6 +2253,9 @@ class WerewolfFan(Player):
         self.team = 'Wolf'
         self.hhtargetable = False
         self.category = 'Wildcard'
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the day or night by posting [b]here[/b]:
 
@@ -2090,7 +2263,8 @@ class WerewolfFan(Player):
 
     def immediate_action(self, keyword, victims):
         if keyword == 'reveal' and len(victims) == 1 and victims[0].alive:
-            self.chat.write_message(f"You will reveal your role to {victims[0].screenname} "
+            self.chat.write_message(f"You will reveal your role to "
+                                    f"{victims[0].screenname if self.night > 1 else victims[0].noun} "
                                     f"at the start of the next night.")
         return []
 
@@ -2106,13 +2280,15 @@ class Cupid(Player):
     def __init__(self, gamenum=0, screenname='', noun=''):
         super().__init__()
         self.role = 'Cupid'
-        self.night = 1
         self.screenname = screenname
         self.gamenum = gamenum
         self.noun = noun
         self.hhtargetable = False
         self.category = 'Wildcard'
         self.can_couple = True
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the first night by posting [b]here[/b]:
 
@@ -2134,12 +2310,10 @@ class Cupid(Player):
         if (keyword == 'couple' and len(victims) == 2 and are_all_alive(victims)
                 and victims[1].gamenum != victims[0].gamenum and self.night == 1
                 and self.gamenum != victims[0].gamenum and self.gamenum != victims[1].gamenum):
-            self.night = self.night + 1
             victims[0].coupled = True
             victims[1].coupled = True
         if (keyword == 'couple' and len(victims) == 1 and are_all_alive(victims)
                 and self.night == 1 and self.gamenum != victims[0].gamenum):
-            self.night = self.night + 1
             victims[0].coupled = True
         return []
 
@@ -2157,6 +2331,9 @@ class Fool(Player):
         self.hhtargetable = False
         self.mm_killable = True
         self.category = 'Wildcard'
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b].'''
 
 
@@ -2174,6 +2351,9 @@ class Headhunter(Player):
         self.mm_killable = True
         self.target_name = ''
         self.category = 'Wildcard'
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Your target is {self.target_name}. Good luck!'''
 
@@ -2194,6 +2374,9 @@ class Alchemist(Player):
         self.hhtargetable = False
         self.mm_killable = True
         self.category = 'Solo Killer'
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
@@ -2209,10 +2392,12 @@ class Alchemist(Player):
     def immediate_action(self, keyword, victims):
         if (keyword == 'kill' and len(victims) == 1 and victims[0].alive
                 and self.gamenum != victims[0].gamenum and not self.current_thread.open):
-            self.chat.write_message(f"You will give the black potion to {victims[0].screenname} tonight.")
+            self.chat.write_message(f"You will give the black potion to "
+                                    f"{victims[0].screenname if self.night > 1 else victims[0].noun} tonight.")
         if (keyword == 'potion' and len(victims) == 1 and victims[0].alive
                 and self.gamenum != victims[0].gamenum and not self.current_thread.open):
-            self.chat.write_message(f"You will give the red potion to {victims[0].screenname} tonight.")
+            self.chat.write_message(f"You will give the red potion to "
+                                    f"{victims[0].screenname if self.night > 1 else victims[0].noun} tonight.")
         return []
 
     def phased_action(self, keyword, victims):
@@ -2241,6 +2426,9 @@ class Arsonist(Player):
         self.mm_killable = True
         self.action_used = False
         self.category = 'Solo Killer'
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
@@ -2257,10 +2445,12 @@ class Arsonist(Player):
         if (keyword == 'douse' and len(victims) == 2 and self.gamenum != victims[0].gamenum
                 and self.gamenum != victims[1].gamenum and victims[1].gamenum != victims[0].gamenum
                 and not self.current_thread.open):
-            self.chat.write_message(f"You are dousing {victims[0].screenname} and {victims[1].screenname} tonight.")
+            self.chat.write_message(f"You are dousing {victims[0].screenname if self.night > 1 else victims[0].noun} "
+                                    f"and {victims[1].screenname if self.night > 1 else victims[1].noun} tonight.")
         if (keyword == 'douse' and len(victims) == 1 and self.gamenum != victims[0].gamenum
                 and not self.current_thread.open):
-            self.chat.write_message(f"You are dousing {victims[0].screenname} tonight.")
+            self.chat.write_message(f"You are dousing {victims[0].screenname if self.night > 1 else victims[0].noun} "
+                                    f"tonight.")
 
     def phased_action(self, keyword, victims):
         if len(victims) == 2:
@@ -2303,6 +2493,9 @@ class Corruptor(Player):
         self.hhtargetable = False
         self.mm_killable = True
         self.category = 'Solo Killer'
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
@@ -2313,7 +2506,8 @@ class Corruptor(Player):
             self.acting_upon = []
         if (keyword == 'corrupt' and len(victims) == 1 and victims[0].alive
                 and not self.current_thread.open and self.gamenum != victims[0].gamenum):
-            self.chat.write_message(f"You will corrupt {victims[0].screenname} tonight.")
+            self.chat.write_message(f"You will corrupt {victims[0].screenname if self.night > 1 else victims[0].noun}"
+                                    f" tonight.")
         return []
 
     def phased_action(self, keyword, victims):
@@ -2334,13 +2528,16 @@ class CultLeader(Player):
         self.conjuror_can_take = False
         self.is_killer = True
         self.gamenum = gamenum
-        self.noun = noun
+        self.noun = self.noun
         self.aura = 'Unknown'
         self.hhtargetable = False
         self.sacrifice_selected = False
         self.mm_killable = True
         self.category = 'Solo Killer'
         self.can_couple = True
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
@@ -2360,7 +2557,9 @@ class CultLeader(Player):
         self.sacrifice_selected = False
         if (keyword == 'convert' and len(victims) == 1 and victims[0].alive and self.gamenum != victims[0].gamenum
                 and not self.current_thread.open):
-            self.chat.write_message(f"You will attempt to convert {victims[0].screenname} to the cult tonight.")
+            self.chat.write_message(f"You will attempt to convert "
+                                    f"{victims[0].screenname if self.night > 1 else victims[0].noun} "
+                                    f"to the cult tonight.")
         if (keyword == 'sacrifice' and len(victims) == 1 and victims[0].alive
                 and self.gamenum != victims[0].gamenum and victims[0].cult and not self.current_thread.open):
             self.sacrifice_selected = True
@@ -2378,6 +2577,8 @@ class CultLeader(Player):
         if (keyword == 'convert' and len(victims) == 1 and victims[0].alive and self.gamenum != victims[0].gamenum
                 and not self.current_thread.open):
             victims[0].cult = True
+            self.chat.write_message(f"You successfully converted {victims[0].screenname} to the cult.")
+            victims[0].chat.write_message(f"You have been converted to the cult.")
         elif (keyword == 'sacrifice' and len(victims) == 1 and victims[0].alive
                 and self.gamenum != victims[0].gamenum and victims[0].cult and not self.current_thread.open):
             return ['sacrificed', self, victims[0]]
@@ -2402,6 +2603,9 @@ class EvilDetective(Player):
         self.hhtargetable = False
         self.mm_killable = True
         self.category = 'Solo Killer'
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
@@ -2410,7 +2614,8 @@ class EvilDetective(Player):
     def immediate_action(self, keyword, victims):
         if (keyword == 'check' and len(victims) == 2 and are_all_alive(victims)
                 and victims[1].gamenum != victims[0].gamenum and not self.current_thread.open):
-            self.chat.write_message(f"You will check {victims[0].screenname} and {victims[1].screenname} tonight.")
+            self.chat.write_message(f"You will check {victims[0].screenname if self.night > 1 else victims[0].noun}"
+                                    f" and {victims[1].screenname if self.night > 1 else victims[1].noun} tonight.")
         return []
 
     def phased_action(self, keyword, victims):
@@ -2449,6 +2654,12 @@ class Illusionist(Player):
         self.hhtargetable = False
         self.mm_killable = True
         self.category = 'Solo Killer'
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
@@ -2463,7 +2674,8 @@ class Illusionist(Player):
             return ['illusionist']
         if (keyword == 'disguise' and len(victims) == 1 and self.gamenum != victims[0].gamenum
                 and not self.current_thread.open):
-            self.chat.write_message(f"You are disguising {victims[0].screenname} tonight.")
+            self.chat.write_message(f"You are disguising {victims[0].screenname if self.night > 1 else victims[0].noun}"
+                                    f" tonight.")
         return []
 
     def phased_action(self, keyword, victims):
@@ -2490,6 +2702,9 @@ class Infector(Player):
         self.hhtargetable = False
         self.mm_killable = True
         self.category = 'Solo Killer'
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
@@ -2500,7 +2715,8 @@ class Infector(Player):
             self.acting_upon = []
         if (keyword == 'infect' and len(victims) == 1 and victims[0].alive
                 and not self.current_thread.open and self.gamenum != victims[0].gamenum):
-            self.chat.write_message(f"You will infect {victims[0].screenname} tonight.")
+            self.chat.write_message(f"You will infect {victims[0].screenname if self.night > 1 else victims[0].noun}"
+                                    f" tonight.")
         return []
 
     def phased_action(self, keyword, victims):
@@ -2529,6 +2745,9 @@ class Instigator(Player):
         self.is_killer = True
         self.category = 'Solo Killer'
         self.can_couple = True
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night if you are by yourself by posting [b]here[/b]:
 
@@ -2537,7 +2756,8 @@ class Instigator(Player):
     def immediate_action(self, keyword, victims):
         if (keyword == 'kill' and self.instigators_dead and len(victims) == 1
                 and victims[0].alive and self.gamenum != victims[0].gamenum and not self.current_thread.open):
-            self.chat.write_message(f"You will kill {victims[0].screenname} tonight.")
+            self.chat.write_message(f"You will kill {victims[0].screenname if self.night > 1 else victims[0].noun}"
+                                    f" tonight.")
         return []
 
     def phased_action(self, keyword, victims):
@@ -2563,6 +2783,9 @@ class SerialKiller(Player):
         self.hhtargetable = False
         self.mm_killable = True
         self.category = 'Solo Killer'
+        self.apparent_role = self.role
+        self.apparent_team = self.team
+        self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
@@ -2574,8 +2797,12 @@ class SerialKiller(Player):
         if (keyword == 'kill' and len(victims) <= (self.mp + 100) // 100 and are_all_alive(victims)
                 and not self.current_thread.open):
             text = "You will attempt to kill the following players tonight: "
-            for i in victims:
-                text = text + f"\n{i.screenname}"
+            if self.night == 1:
+                for i in victims:
+                    text = text + f"\n{i.noun}"
+            else:
+                for i in victims:
+                    text = text + f"\n{i.screenname}"
             self.chat.write_message(text)
         return []
 
