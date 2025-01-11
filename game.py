@@ -94,6 +94,8 @@ class Game:
         self.cult_chat = tc.Chat()
         self.cultleader = role.Player()
         self.to_skip = []
+        self.insti_chat = tc.Chat()
+        self.lover_chat = tc.Chat()
 
     def print_nouns(self):
         bbcode = "[table]"
@@ -492,7 +494,8 @@ Winning Conditions:
 
     # can be chat or thread pieces passed in
     def get_keyword_phrases(self, pieces, dedupe=True, new=False):
-        phrases = [[], [], [], [], []]
+        # pieces = message_id, user_id, parsed_message, is_reacted_to, message_time, chat/thread obj
+        phrases = [[], [], [], [], [], []]
         for index, message in enumerate(pieces[2]):
             message_uniform = message.upper().replace('"', '').replace("'", '').replace("@", '')
             # if night 1, delete player names to avoid targeting
@@ -523,20 +526,22 @@ Winning Conditions:
                             if not new:
                                 phrases[0].append(pieces[0][index])  # returns post_id
                                 phrases[1].append(self.role_dictionary[self.memberid_to_gamenum(pieces[1][index])])
-                                phrases[2].append(message_words[i+1])  # returns keyword
+                                phrases[2].append(message_words[i + 1])  # returns keyword
                                 phrases[3].append(users)  # returns users to apply it to (if applicable)
-                                phrases[4].append(pieces[4][index])
+                                phrases[4].append(pieces[4][index])  # returns time
+                                phrases[5].append(pieces[5][index])  # returns chat/thread obj
                             else:
                                 if pieces[3][index] is False:
                                     phrases[0].append(pieces[0][index])  # returns post_id
                                     phrases[1].append(self.role_dictionary[self.memberid_to_gamenum(pieces[1][index])])
                                     phrases[2].append(message_words[i + 1])  # returns keyword
                                     phrases[3].append(users)  # returns users to apply it to (if applicable)
-                                    phrases[4].append(pieces[4][index])
+                                    phrases[4].append(pieces[4][index])  # returns time
+                                    phrases[5].append(pieces[5][index])  # returns chat/thread obj
         if dedupe:
             # Once we get all valid commands, now iterate backwards,
             # and we keep only the latest valid command per person for each keyword
-            final_commands = [[], [], [], [], []]
+            final_commands = [[], [], [], [], [], []]
             member_keyword_combos = []
             cancel = False
             for i in range(len(phrases[0]) - 1, -1, -1):
@@ -549,21 +554,25 @@ Winning Conditions:
                     final_commands[2].append(phrases[2][i])  # returns keyword, reverse order
                     final_commands[3].append(phrases[3][i])  # returns users to apply it to, reverse order
                     final_commands[4].append(phrases[4][i])  # returns time, reverse order
+                    final_commands[5].append(phrases[5][i])  # returns chat/thread, reverse order
                     if phrases[2][i] == "cancel":
                         cancel = True
-            final_commands_in_order = [[], [], [], [], []]
+            final_commands_in_order = [[], [], [], [], [], []]
             for i in range(len(final_commands[0])):
                 final_commands_in_order[0].append(final_commands[0][len(final_commands[0]) - i - 1])  # return post_id
                 final_commands_in_order[1].append(final_commands[1][len(final_commands[0]) - i - 1])  # return player
                 final_commands_in_order[2].append(final_commands[2][len(final_commands[0]) - i - 1])  # return keyword
                 final_commands_in_order[3].append(final_commands[3][len(final_commands[0]) - i - 1])  # return victims
                 final_commands_in_order[4].append(final_commands[4][len(final_commands[0]) - i - 1])  # return time
+                final_commands_in_order[5].append(final_commands[5][len(final_commands[0]) - i - 1])  # return chat
         else:
             final_commands_in_order = phrases.copy()
         return final_commands_in_order
 
     def wolf_vote_update(self):
         pieces = self.wolf_chat.convo_pieces()
+        chat = [self.wolf_chat for _ in range(len(pieces[0]))]
+        pieces.append(chat)
         pot_votes = self.get_keyword_phrases(pieces, new=True)
         for i, post in enumerate(pieces[0]):
             if pieces[3][i] is False:
@@ -590,7 +599,10 @@ Winning Conditions:
                                              f"voting for [b]{votes[i].noun}[/b]")
 
     def count_wolf_votes(self):
-        pot_votes = self.get_keyword_phrases(self.wolf_chat.convo_pieces())
+        pieces = self.wolf_chat.convo_pieces()
+        chat = [self.wolf_chat for _ in range(len(pieces[0]))]
+        pieces.append(chat)
+        pot_votes = self.get_keyword_phrases(pieces)
         post_ids = []
         poster_ids = []
         votes = []
@@ -765,28 +777,80 @@ Winning Conditions:
         self.wolf_chat.create_conversation(f"{self.game_title} Wolf Chat", wolf_message, wolves_id)
 
     def phased_actions(self, rolelist):
+        night_dict = {'messageids': [], 'userids': [], 'messages': [], 'reacted': [], 'time': [], 'chat': []}
+        if self.cupid.gamenum != 0:
+            [messageids, userids, messages, reacted, time] = self.lover_chat.convo_pieces()
+            night_dict['messageids'].extend(messageids)
+            night_dict['userids'].extend(userids)
+            night_dict['messages'].extend(messages)
+            night_dict['reacted'].extend(reacted)
+            night_dict['time'].extend(time)
+            night_dict['chat'].extend([self.lover_chat for _ in range(len(messageids))])
+        if self.instigator.gamenum != 0:
+            [messageids, userids, messages, reacted, time] = self.insti_chat.convo_pieces()
+            night_dict['messageids'].extend(messageids)
+            night_dict['userids'].extend(userids)
+            night_dict['messages'].extend(messages)
+            night_dict['reacted'].extend(reacted)
+            night_dict['time'].extend(time)
+            night_dict['chat'].extend([self.insti_chat for _ in range(len(messageids))])
+        [messageids, userids, messages, reacted, time] = self.wolf_chat.convo_pieces()
+        night_dict['messageids'].extend(messageids)
+        night_dict['userids'].extend(userids)
+        night_dict['messages'].extend(messages)
+        night_dict['reacted'].extend(reacted)
+        night_dict['time'].extend(time)
+        night_dict['chat'].extend([self.wolf_chat for _ in range(len(messageids))])
+        null_postid = []
+        null_poster = []
+        null_action = []
+        null_victim = []
+        null_times = []
+        null_chat = []
         for player in self.role_dictionary:
-            if self.role_dictionary[player].role in rolelist and self.role_dictionary[player].alive:
-                if (not self.role_dictionary[player].jailed and not self.role_dictionary[player].concussed
-                        and not self.role_dictionary[player].nightmared):
-                    [_, _, actions, victims, _] = self.get_keyword_phrases(
-                        self.role_dictionary[player].chat.convo_pieces())  # remove all before "cancel" - BW
-                    if len(actions) == 0:  # do this so that the phased method gets run even if the player does nothing
-                        actions = ['null']
-                        victims = ['null']
-                    if self.role_dictionary[player].role == 'Violinist':
-                        victims.append(self.first_death)
-                    for i in range(len(actions)):
-                        outcome = self.role_dictionary[player].phased_action(actions[i].lower(), victims[i])
-                        if len(outcome) == 3:
-                            self.new_thread_text = self.new_thread_text + self.kill_player(outcome[0], outcome[1],
-                                                                                           outcome[2])
-                        if len(outcome) == 1:  # Place Beast Hunter Trap if timeframe reached
-                            self.role_dictionary[outcome[0]].protected_by['Beast Hunter'].append(
-                                self.role_dictionary[player])
-                        if len(outcome) == 2:
-                            if outcome[0] == 'vote':
-                                self.manual_votes.extend(outcome[1])
+            [messageids, userids, messages, reacted, time] = self.role_dictionary[player].chat.convo_pieces()
+            night_dict['messageids'].extend(messageids)
+            night_dict['userids'].extend(userids)
+            night_dict['messages'].extend(messages)
+            night_dict['reacted'].extend(reacted)
+            night_dict['time'].extend(time)
+            night_dict['chat'].extend([self.role_dictionary[player].chat for _ in range(len(messageids))])
+            null_postid.append('null')
+            null_poster.append(self.role_dictionary[player])
+            null_action.append('null')
+            null_victim.append('null')
+            null_times.append(0)
+            null_chat.append(self.role_dictionary[player].chat)
+        to_sort = pd.DataFrame.from_dict(night_dict)
+        to_sort = to_sort.sort_values('time')
+        messageids = to_sort['messageids'].to_list()
+        userids = to_sort['userids'].to_list()
+        messages = to_sort['messages'].to_list()
+        reacted = to_sort['reacted'].to_list()
+        time = to_sort['time'].to_list()
+        chat = to_sort['chat'].to_list()
+        pieces = [messageids, userids, messages, reacted, time, chat]
+        [postids, posters, actions, victims, times, chats] = self.get_keyword_phrases(pieces, dedupe=True)
+        # have to do all this null stuff so that even if a player does absolutely nothing, the method runs
+        postids.extend(null_postid)
+        posters.extend(null_poster)
+        actions.extend(null_action)
+        victims.extend(null_victim)
+        times.extend(null_times)
+        chats.extend(null_chat)
+        for i in range(len(postids)):
+            if (posters[i].role in rolelist and posters[i].alive and not posters[i].jailed
+                    and not posters[i].concussed and not posters[i].nightmared):
+                if posters[i].role == 'Violinist':
+                    victims[i].append(self.first_death)
+                outcome = posters[i].phased_action(postids[i], actions[i].lower(), victims[i], chats[i])
+                if len(outcome) == 3:
+                    self.new_thread_text = self.new_thread_text + self.kill_player(outcome[0], outcome[1], outcome[2])
+                if len(outcome) == 1:  # Place Beast Hunter Trap if timeframe reached
+                    self.role_dictionary[outcome[0]].protected_by['Beast Hunter'].append(posters[i])
+                    if len(outcome) == 2:
+                        if outcome[0] == 'vote':
+                            self.manual_votes.extend(outcome[1])
 
     def solo_attack(self, rolelist):
         # Go through all players, but we only care about the solo killers
@@ -798,8 +862,10 @@ Winning Conditions:
                 if (not self.role_dictionary[solo_killer].jailed and not self.role_dictionary[solo_killer].concussed
                         and not self.role_dictionary[solo_killer].nightmared):
                     # Go through solo killer chat, pick out all keywords and who they apply to
-                    [_, _, actions, victims, _] = self.get_keyword_phrases(
-                        self.role_dictionary[solo_killer].chat.convo_pieces())
+                    pieces = self.role_dictionary[solo_killer].chat.convo_pieces()
+                    chat = [self.role_dictionary[solo_killer].chat for _ in range(len(pieces[0]))]
+                    pieces.append(chat)
+                    [postids, _, actions, victims, _, _] = self.get_keyword_phrases(pieces)
                     # Go through each keyword. Most roles should only be one
                     for i in range(len(actions)):
                         # We need to figure out if the attack is blocked. Lots of ways to block an attack
@@ -847,8 +913,11 @@ Winning Conditions:
                                         blocked = True
                                         for blocker in self.role_dictionary[attacked].protected_by[j]:
                                             if blocker.shield is False:
-                                                outcome = self.role_dictionary[solo_killer].phased_action(
-                                                    actions[i].lower(), [blocker])
+                                                outcome = (self.role_dictionary[solo_killer].
+                                                           phased_action(postids[i],
+                                                                         actions[i].lower(),
+                                                                         [blocker],
+                                                                         self.role_dictionary[solo_killer].chat))
                                                 if len(outcome) == 3:
                                                     self.new_thread_text = (self.new_thread_text +
                                                                             self.kill_player(outcome[0],
@@ -907,9 +976,11 @@ Winning Conditions:
                                                 "Your trap was triggered by an attack tonight, but the attacker was "
                                                 "too strong and survived. You need to reset your trap.")
                             if not blocked:
-                                outcome = self.role_dictionary[solo_killer].phased_action(actions[i].lower(),
-                                                                                          [self.role_dictionary[
-                                                                                              attacked]])
+                                outcome = (self.role_dictionary[solo_killer].
+                                           phased_action(postids[i],
+                                                         actions[i].lower(),
+                                                         [self.role_dictionary[attacked]],
+                                                         self.role_dictionary[solo_killer].chat))
                                 # outcome returns kill method, killer, victim OR LIST of victims. Need to check.
                                 if len(outcome) == 3:
                                     # if there's multiple victims, handle those first, edet and SK
@@ -1092,8 +1163,7 @@ Winning Conditions:
                                f'[b]Instigator[/b]. Their word is [b]'
                                f'{self.role_dictionary[self.memberid_to_gamenum(instigators[0])].noun}[/b].\n\n') +
                               insti_text)
-                insti_chat = tc.Chat()
-                insti_chat.create_conversation("Instigators Chat", insti_text, instigators)
+                self.insti_chat.create_conversation("Instigators Chat", insti_text, instigators)
         else:
             self.day_thread.write_post(f"Night actions please. The next day will start at "
                                        f"[TIME=datetime]{self.night_close_tm.strftime('%Y-%m-%dT%H:%M:%S-0500')}"
@@ -1158,12 +1228,6 @@ Winning Conditions:
                 self.mark_pm.write_message(f"Can you add {self.role_dictionary[player].screenname} please?")
             # remove mutes
             self.role_dictionary[player].muted_by = []
-            # WWFan shows role at start of night
-            if self.role_dictionary[player].role == 'Werewolf Fan':
-                [_, _, actions, membernames, _] = self.get_keyword_phrases(
-                    self.role_dictionary[player].chat.convo_pieces())
-                for j in range(len(actions)):
-                    self.role_dictionary[player].phased_action(actions[j].lower(), membernames[j])
             # Revive players spelled by Ritualist if time period has been met, also dump Ritu MP
             if (self.role_dictionary[player].spelled and not self.role_dictionary[player].alive
                     and len(self.role_dictionary[player].corrupted_by) == 0):
@@ -1180,6 +1244,7 @@ Winning Conditions:
                 self.spell_count += 1
             if self.role_dictionary[player].role == 'Ritualist' and self.spell_count > 1:
                 self.role_dictionary[player].mp = 0
+        self.phased_actions(['Werewolf Fan'])
         self.output_data()
 
     def end_night(self):
@@ -1193,6 +1258,7 @@ Winning Conditions:
                 self.confusion_in_effect = True
         self.win_conditions()
         # PHASE 2 (Wolves break out of warden prison or warden weapon used)
+        # BW REWRITE LOOP NOT NECESSARY
         if len(self.jailed) == 2:
             action_taken = False
             for i in range(2):
@@ -1377,14 +1443,12 @@ Winning Conditions:
                                              f' They are the [b]{self.couple[0].role}.[/b]\n\n'
                                              f'[b]{self.couple[1].screenname}[/b] is number {self.couple[1].gamenum}.'
                                              f' They are the [b]{self.couple[1].role}.[/b]')
-            lovers = tc.Chat()
-            lovers.create_conversation(f"{self.game_title} Lovers Chat",
-                                       cupid_message,
-                                       [self.gamenum_to_memberid(self.couple[0].gamenum),
-                                        self.gamenum_to_memberid(self.couple[1].gamenum)])
-            cupid_chat = self.cupid.chat
-            cupid_chat.write_message(f"Your couple is {self.couple[0].screenname} and "
-                                     f"{self.couple[1].screenname}. Good luck!")
+
+            self.lover_chat.create_conversation(f"{self.game_title} Lovers Chat", cupid_message,
+                                                [self.gamenum_to_memberid(self.couple[0].gamenum),
+                                                 self.gamenum_to_memberid(self.couple[1].gamenum)])
+            self.cupid.chat.write_message(f"Your couple is {self.couple[0].screenname} and "
+                                          f"{self.couple[1].screenname}. Good luck!")
         rand_time = random.random()*20+2
         self.alch_deaths_tm = (self.day_open_tm + datetime.timedelta(hours=rand_time//1) +
                                datetime.timedelta(minutes=60 * (rand_time % 1)))  # Time of alch deaths
@@ -1492,8 +1556,10 @@ Winning Conditions:
                 if (self.role_dictionary[player].alive and not self.role_dictionary[player].concussed and
                         len(self.role_dictionary[player].corrupted_by) == 0 and
                         len(self.role_dictionary[player].muted_by) == 0):
-                    [_, _, actions, victims, _] = self.get_keyword_phrases(
-                        self.role_dictionary[player].chat.convo_pieces())  # remove all before "cancel" - BW
+                    pieces = self.role_dictionary[player].chat.convo_pieces()
+                    chat = [self.role_dictionary[player].chat for _ in range(len(pieces[0]))]
+                    pieces.append(chat)
+                    [_, _, actions, victims, _, _] = self.get_keyword_phrases(pieces)
                     for i in range(len(actions)):
                         if actions[i].lower() == "vote":
                             outcome = self.role_dictionary[player].get_shadow_vote('vote', victims)
@@ -1563,12 +1629,14 @@ Winning Conditions:
     def run_day_checks(self):
         self.rebuild_dict()
         pieces = self.day_thread.thread_pieces()
+        chat = [self.day_thread for _ in range(len(pieces[0]))]
+        pieces.append(chat)
         # Get posts from the thread
-        [public_posts, public_posters, public_actions, public_victims, public_times] = (
+        [public_posts, public_posters, public_actions, public_victims, public_times, public_obj] = (
             self.get_keyword_phrases(pieces, dedupe=False, new=True))
         if self.cultleader.gamenum > 0:
             cult = []
-            [post_ids, posters, posts, reacts, _] = self.cult_chat.convo_pieces()
+            [post_ids, posters, posts, reacts] = self.cult_chat.convo_pieces()
             for player in self.role_dictionary:
                 if self.role_dictionary[player].cult:
                     cult.append(self.role_dictionary[player])
@@ -1589,27 +1657,30 @@ Winning Conditions:
             if self.role_dictionary[player].conjuror is True and player.new_role.role != player.role:
                 self.role_swap(self.role_dictionary[player], player.new_role)
             chat_pieces = self.role_dictionary[player].chat.convo_pieces()
-            [_, private_posters, private_actions, private_victims, private_times] = (
+            chat = [self.role_dictionary[player].chat for _ in range(len(pieces[0]))]
+            chat_pieces.append(chat)
+            [private_posts, private_posters, private_actions, private_victims, private_times, private_obj] = (
                 self.get_keyword_phrases(chat_pieces, dedupe=False, new=True))
             for i, message in enumerate(chat_pieces[0]):
                 if chat_pieces[3][i] is False:
                     self.role_dictionary[player].chat.seen_message(message)
-            private_post = ["private" for _ in private_times]
             # Combine thread posts and chat posts into one group
-            public_posts.extend(private_post)
+            public_posts.extend(private_posts)
             public_posters.extend(private_posters)
             public_actions.extend(private_actions)
             public_victims.extend(private_victims)
             public_times.extend(private_times)
+            public_obj.extend(private_obj)
         # Sort by time so actions occur in order
         to_pandas = {'posts': public_posts, 'posters': public_posters,
-                     'actions': public_actions, 'victims': public_victims, 'times': public_times}
+                     'actions': public_actions, 'victims': public_victims, 'times': public_times, 'object': public_obj}
         frame = pd.DataFrame.from_dict(to_pandas)
         frame = frame.sort_values('times')
         posts = frame['posts'].tolist()
         posters = frame['posters'].tolist()
         actions = frame['actions'].tolist()
         victims = frame['victims'].tolist()
+        objs = frame['object'].tolist()
         post_skips = False
         skip_post = 0
         # Apply actions
@@ -1619,7 +1690,7 @@ Winning Conditions:
                 post_skips = True
                 skip_post = posts[i]
             if player.alive and not player.concussed and len(player.corrupted_by) == 0:
-                outcome = player.immediate_action(actions[i].lower(), victims[i])
+                outcome = player.immediate_action(posts[i], actions[i].lower(), victims[i], objs[i])
                 if len(outcome) == 1:
                     if (outcome[0] == 'Illusionist'
                             and datetime.datetime.now() < self.day_close_tm - datetime.timedelta(hours=2)):
@@ -1669,7 +1740,9 @@ Winning Conditions:
         self.wolf_vote_update()
         for player in self.role_dictionary:
             pieces = self.role_dictionary[player].chat.convo_pieces()
-            [_, _, actions, victims, _] = self.get_keyword_phrases(pieces, new=True)
+            chat = [self.role_dictionary[player].chat for _ in range(len(pieces[0]))]
+            pieces.append(chat)
+            [postids, _, actions, victims, _, _] = self.get_keyword_phrases(pieces, new=True)
             for i, message in enumerate(pieces[0]):
                 if pieces[3][i] is False:
                     self.role_dictionary[player].chat.seen_message(message)
@@ -1678,7 +1751,11 @@ Winning Conditions:
                 if (self.role_dictionary[player].alive and not self.role_dictionary[player].jailed
                         and not self.role_dictionary[player].concussed and not self.role_dictionary[
                             player].nightmared):
-                    outcome = self.role_dictionary[player].immediate_action(actions[i].lower(), victims[i])
+                    outcome = (self.role_dictionary[player].
+                               immediate_action(postids[i],
+                                                actions[i].lower(),
+                                                victims[i],
+                                                self.role_dictionary[player].chat))
                     if len(outcome) == 3:
                         self.new_thread_text = (
                                 self.new_thread_text +
@@ -2166,7 +2243,7 @@ Winning Conditions:
                       'day_open_tm', 'day_close_tm', 'alch_deaths_tm', 'first_death', 'couple', 'cupid',
                       'instigator', 'confusion_in_effect', 'manual_votes', 'shadow_in_effect', 'shadow_available',
                       'tie_count', 'death', 'game_over', 'night_close_tm', 'night_open_tm', 'cult_chat', 'cultleader',
-                      'to_skip']
+                      'to_skip', 'insti_chat', 'lover_chat']
         # output master data to csv
         self.master_data.to_csv(f"{output_dir + self.game_title}.csv", index=False)
         # output game attributes to a text file
