@@ -24,12 +24,14 @@ while not wolf.game_over:
             wolf.day_thread.gameover()
             wolf.day_thread.create_thread(f"{wolf.game_title} Day {wolf.night}", wolf.day_post())
             wolf.day_thread.stick_thread()
+            wolf.day_thread.lock_thread()
     wolf.run_night_checks()
     if not new_thread:
         new_thread = True
         wolf.day_thread.gameover()
         wolf.day_thread.create_thread(f"{wolf.game_title} Day {wolf.night}", wolf.day_post())
         wolf.day_thread.stick_thread()
+        wolf.day_thread.lock_thread()
     wolf.end_night()
     wolf.start_day()
     while datetime.datetime.now() < wolf.day_close_tm:

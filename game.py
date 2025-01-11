@@ -363,11 +363,11 @@ class Game:
                     villagers_alive = True
                 elif self.role_dictionary[j].category == 'Werewolf':
                     wolves_alive = True
-                elif 'Wildcard' in self.role_dictionary[j].category:
+                elif 'Wildcard' in self.role_dictionary[j].category or self.role_dictionary[j].role == 'Werewolf':
                     wildcards_alive = True
                 elif 'Solo Killer' in self.role_dictionary[j].category:
                     solos_alive = True
-        text = (f'''The day will start at [TIME=datetime]{self.day_open_tm.strftime('%Y-%M-%dT%H:%M:%S-0500')}[/TIME]
+        text = (f'''The day will start at [TIME=datetime]{self.day_open_tm.strftime('%Y-%m-%dT%H:%M:%S-0500')}[/TIME]
         
         Dictionary: https://gwforums.com/threads/zell-wolf-role-dictionary-and-hall-of-fame.427/
 
@@ -574,9 +574,6 @@ Winning Conditions:
         chat = [self.wolf_chat for _ in range(len(pieces[0]))]
         pieces.append(chat)
         pot_votes = self.get_keyword_phrases(pieces, new=True)
-        for i, post in enumerate(pieces[0]):
-            if pieces[3][i] is False:
-                self.wolf_chat.seen_message(post)
         post_ids = []
         posters = []
         votes = []
@@ -616,7 +613,7 @@ Winning Conditions:
         for i in range(len(post_ids)-1, -1, -1):
             if (self.role_dictionary[self.name_to_gamenum(votes[i])].wolf_targetable is False or
                     self.role_dictionary[self.memberid_to_gamenum(poster_ids[i])].wolf_voting_power == 0 or
-                    datetime.datetime.fromtimestamp(times[i]) < self.night_open_tm):
+                    datetime.datetime.fromtimestamp(times[i]) < self.day_open_tm):
                 del post_ids[i]
                 del poster_ids[i]
                 del votes[i]
@@ -633,8 +630,6 @@ Winning Conditions:
         vote_table = pd.DataFrame.from_dict(to_pandas)
         vote_tabulation = vote_table.groupby('Voted Player').sum().reset_index()
         vote_tabulation = vote_tabulation.sort_values(by=['Votes', 'Wolf Power'], ascending=False)
-        # print(vote_table[['Player Voting', 'Voted Player']])
-        # print(vote_tabulation)
         vote_list = vote_tabulation['Voted Player'].tolist()
         fin_votes = []
         # convert screennames to role objects
@@ -996,6 +991,8 @@ Winning Conditions:
 
     def wolf_attack(self):
         votes = self.count_wolf_votes()
+        if len(votes) == 0:
+            return
         berserk = False
         # Check for berserk
         for i in self.role_dictionary:
@@ -1348,6 +1345,8 @@ Winning Conditions:
         self.solo_attack(['Alchemist', 'Arsonist', 'Corruptor', 'Cult Leader', 'Evil Detective',
                           'Instigator', 'Serial Killer'])
 
+        self.phased_actions(['Berserk Wolf'])
+
         # Phase 12
         self.wolf_attack()
 
@@ -1364,7 +1363,7 @@ Winning Conditions:
                 self.role_dictionary[player].apparent_aura = self.role_dictionary[player].aura
                 self.role_dictionary[player].apparent_team = self.role_dictionary[player].team
 
-            if self.role_dictionary[player].disguised:
+            if len(self.role_dictionary[player].disguised_by) > 0:
                 self.role_dictionary[player].apparent_aura = "Unknown"
                 self.role_dictionary[player].apparent_team = "Illusionist"
                 self.role_dictionary[player].apparent_role = "Illusionist"
@@ -1396,6 +1395,7 @@ Winning Conditions:
         # check if Cupid / Wolf Chat open
         is_alpha = False
         cult = []
+        self.day_thread.unlock_thread()
         self.to_skip = []
         for player in self.role_dictionary:
             self.role_dictionary[player].night += 1
@@ -1526,10 +1526,10 @@ Winning Conditions:
         self.day_thread.create_poll(alive)
         if self.new_thread_text == '':
             self.new_thread_text = 'Nothing happened last night.\n\n'
+        self.day_close_tm = self.day_open_tm + datetime.timedelta(hours=24)
         self.new_thread_text = self.new_thread_text + (f"The day will end at [TIME=datetime]"
                                                        f"{self.day_close_tm.strftime('%Y-%m-%dT%H:%M:%S-0500')}[/TIME]")
         self.day_thread.write_post(self.new_thread_text)
-        self.day_close_tm = self.day_open_tm + datetime.timedelta(hours=24)
         self.output_data()
         if self.night == 1:
             self.day_thread.write_post(self.print_nouns())
@@ -1636,7 +1636,7 @@ Winning Conditions:
             self.get_keyword_phrases(pieces, dedupe=False, new=True))
         if self.cultleader.gamenum > 0:
             cult = []
-            [post_ids, posters, posts, reacts] = self.cult_chat.convo_pieces()
+            [post_ids, posters, posts, reacts, _] = self.cult_chat.convo_pieces()
             for player in self.role_dictionary:
                 if self.role_dictionary[player].cult:
                     cult.append(self.role_dictionary[player])
@@ -1657,7 +1657,7 @@ Winning Conditions:
             if self.role_dictionary[player].conjuror is True and player.new_role.role != player.role:
                 self.role_swap(self.role_dictionary[player], player.new_role)
             chat_pieces = self.role_dictionary[player].chat.convo_pieces()
-            chat = [self.role_dictionary[player].chat for _ in range(len(pieces[0]))]
+            chat = [self.role_dictionary[player].chat for _ in range(len(chat_pieces[0]))]
             chat_pieces.append(chat)
             [private_posts, private_posters, private_actions, private_victims, private_times, private_obj] = (
                 self.get_keyword_phrases(chat_pieces, dedupe=False, new=True))
@@ -1707,7 +1707,7 @@ Winning Conditions:
                                                    self.kill_player(outcome[0], outcome[1], outcome[2]))
                     else:
                         self.day_thread.write_post(self.kill_player(outcome[0], outcome[1], outcome[2]))
-                outcome2 = player.shoot_forger_gun(actions[i].lower(), victims[i])
+                outcome2 = player.shoot_forger_gun(actions[i].lower(), victims[i], self.day_thread)
                 if len(outcome2) == 3:
                     if posts[i] != 'private':
                         self.day_thread.write_post(self.day_thread.quote_post(posts[i]) +
@@ -1738,35 +1738,67 @@ Winning Conditions:
     def run_night_checks(self):
         self.rebuild_dict()
         self.wolf_vote_update()
+        night_dict = {'messageids': [], 'userids': [], 'messages': [], 'reacted': [], 'time': [], 'chat': []}
+        if self.cupid.gamenum != 0:
+            [messageids, userids, messages, reacted, time] = self.lover_chat.convo_pieces()
+            night_dict['messageids'].extend(messageids)
+            night_dict['userids'].extend(userids)
+            night_dict['messages'].extend(messages)
+            night_dict['reacted'].extend(reacted)
+            night_dict['time'].extend(time)
+            night_dict['chat'].extend([self.lover_chat for _ in range(len(messageids))])
+        if self.instigator.gamenum != 0:
+            [messageids, userids, messages, reacted, time] = self.insti_chat.convo_pieces()
+            night_dict['messageids'].extend(messageids)
+            night_dict['userids'].extend(userids)
+            night_dict['messages'].extend(messages)
+            night_dict['reacted'].extend(reacted)
+            night_dict['time'].extend(time)
+            night_dict['chat'].extend([self.insti_chat for _ in range(len(messageids))])
+        [messageids, userids, messages, reacted, time] = self.wolf_chat.convo_pieces()
+        night_dict['messageids'].extend(messageids)
+        night_dict['userids'].extend(userids)
+        night_dict['messages'].extend(messages)
+        night_dict['reacted'].extend(reacted)
+        night_dict['time'].extend(time)
+        night_dict['chat'].extend([self.wolf_chat for _ in range(len(messageids))])
         for player in self.role_dictionary:
-            pieces = self.role_dictionary[player].chat.convo_pieces()
-            chat = [self.role_dictionary[player].chat for _ in range(len(pieces[0]))]
-            pieces.append(chat)
-            [postids, _, actions, victims, _, _] = self.get_keyword_phrases(pieces, new=True)
-            for i, message in enumerate(pieces[0]):
-                if pieces[3][i] is False:
-                    self.role_dictionary[player].chat.seen_message(message)
-            for i in range(len(actions)):
-                self.role_dictionary[player].skip_check(actions[i].lower())
-                if (self.role_dictionary[player].alive and not self.role_dictionary[player].jailed
-                        and not self.role_dictionary[player].concussed and not self.role_dictionary[
-                            player].nightmared):
-                    outcome = (self.role_dictionary[player].
-                               immediate_action(postids[i],
-                                                actions[i].lower(),
-                                                victims[i],
-                                                self.role_dictionary[player].chat))
-                    if len(outcome) == 3:
-                        self.new_thread_text = (
-                                self.new_thread_text +
-                                self.day_thread.write_post(self.kill_player(outcome[0], outcome[1], outcome[2])))
-            if self.role_dictionary[player].role == 'Sorcerer' and self.role_dictionary[player].resigned:
-                self.role_swap(self.role_dictionary[player], role.Werewolf())
-            if self.role_dictionary[player].skipped and self.role_dictionary[player] in self.to_skip:
-                del self.to_skip[self.to_skip.index(self.role_dictionary[player])]
-        if len(self.to_skip) == 0:
-            self.night_close_tm = datetime.datetime.now()
-        self.output_data()
+            [messageids, userids, messages, reacted, time] = self.role_dictionary[player].chat.convo_pieces()
+            night_dict['messageids'].extend(messageids)
+            night_dict['userids'].extend(userids)
+            night_dict['messages'].extend(messages)
+            night_dict['reacted'].extend(reacted)
+            night_dict['time'].extend(time)
+            night_dict['chat'].extend([self.role_dictionary[player].chat for _ in range(len(messageids))])
+        to_sort = pd.DataFrame.from_dict(night_dict)
+        to_sort = to_sort.sort_values('time')
+        messageids = to_sort['messageids'].to_list()
+        userids = to_sort['userids'].to_list()
+        messages = to_sort['messages'].to_list()
+        reacted = to_sort['reacted'].to_list()
+        time = to_sort['time'].to_list()
+        chat = to_sort['chat'].to_list()
+        pieces = [messageids, userids, messages, reacted, time, chat]
+        for i, message in enumerate(pieces[0]):
+            if pieces[3][i] is False:
+                chat[i].seen_message(message)
+        [postids, posters, actions, victims, _, chats] = self.get_keyword_phrases(pieces, new=True)
+        for i in range(len(postids)):
+            posters[i].skip_check(actions[i].lower())
+            if posters[i].alive and not posters[i].jailed and not posters[i].concussed and not posters[i].nightmared:
+                outcome = posters[i].immediate_action(postids[i], actions[i].lower(), victims[i], chats[i])
+                if len(outcome) == 3:
+                    self.new_thread_text = (self.new_thread_text +
+                                            self.day_thread.write_post(self.kill_player(outcome[0],
+                                                                                        outcome[1],
+                                                                                        outcome[2])))
+            if posters[i].role == 'Sorcerer' and posters[i].resigned:
+                self.role_swap(posters[i], role.Werewolf())
+            if posters[i].skipped and posters[i] in self.to_skip:
+                del self.to_skip[self.to_skip.index(posters[i])]
+            if len(self.to_skip) == 0:
+                self.night_close_tm = datetime.datetime.now()
+            self.output_data()
 
     def kill_player(self, method, killer, victim):
         if self.first_death.screenname == '':
@@ -1909,7 +1941,7 @@ Winning Conditions:
             # Unleash Instigator
             self.instigator.instigators_dead = True
         if victim.cult:
-            secondary_text = secondary_text + f"{victim.screenname} was a member of the cult."
+            secondary_text = secondary_text + f"{victim.screenname} was a member of the cult.\n\n"
         if victim.hhtarget and method == 'lynched':
             self.win_conditions('Headhunter')
         if victim.role == 'Fool' and method == 'lynched':
@@ -2250,7 +2282,7 @@ Winning Conditions:
         f = open(f"{output_dir + self.game_title}.txt", 'w')
         for attribute in attributes:
             if isinstance(self.__dict__[attribute], str):
-                f.write(attribute + ": " + '"' + self.__dict__[attribute] + '"' + '\n')
+                f.write(attribute + ": " + "'''" + self.__dict__[attribute].replace('\n', 'ZELL/n') + "'''" + '\n')
             elif isinstance(self.__dict__[attribute], (int, bool)):
                 f.write(attribute + ": " + str(self.__dict__[attribute]) + '\n')
             elif isinstance(self.__dict__[attribute], list):
@@ -2260,14 +2292,14 @@ Winning Conditions:
                         if isinstance(item, (int, bool)):
                             f.write(str(item))
                         elif isinstance(item, str):
-                            f.write(str(item))
+                            f.write(str(item.replace('\n', 'ZELL/n')))
                         elif isinstance(item, role.Player):
                             f.write("Player(" + str(item.gamenum) + ')')
                     else:
                         if isinstance(item, (int, bool)):
                             f.write(str(item) + ', ')
                         elif isinstance(item, str):
-                            f.write(str(item) + ', ')
+                            f.write(str(item.replace('\n', 'ZELL/n')) + ', ')
                         elif isinstance(item, role.Player):
                             f.write("Player(" + str(item.gamenum) + '), ')
                 f.write(']\n')
@@ -2294,7 +2326,8 @@ Winning Conditions:
             del attributes[attributes.index('initial_PM')]
             for attribute in attributes:
                 if isinstance(self.role_dictionary[player].__dict__[attribute], str):
-                    g.write(attribute + ": " + '"' + self.role_dictionary[player].__dict__[attribute] + '"' + '\n')
+                    g.write(attribute + ": " + "'''" +
+                            self.role_dictionary[player].__dict__[attribute].replace('\n', 'ZELL/n') + "'''" + '\n')
                 elif isinstance(self.role_dictionary[player].__dict__[attribute], (int, bool)):
                     g.write(attribute + ": " + str(self.role_dictionary[player].__dict__[attribute]) + '\n')
                 elif isinstance(self.role_dictionary[player].__dict__[attribute], list):
@@ -2304,14 +2337,14 @@ Winning Conditions:
                             if isinstance(item, (int, bool)):
                                 g.write(str(item))
                             elif isinstance(item, str):
-                                g.write(str(item))
+                                g.write(item.replace('\n', 'ZELL/n'))
                             elif isinstance(item, role.Player):
                                 g.write("Player(" + str(item.gamenum) + ')')
                         else:
                             if isinstance(item, (int, bool)):
                                 g.write(str(item) + ', ')
                             elif isinstance(item, str):
-                                g.write(str(item) + ', ')
+                                g.write(item.replace('\n', 'ZELL/n') + ', ')
                             elif isinstance(item, role.Player):
                                 g.write("Player(" + str(item.gamenum) + '), ')
                     g.write(']\n')
@@ -2346,7 +2379,8 @@ Winning Conditions:
         del attributes[attributes.index('initial_PM')]
         for attribute in attributes:
             if isinstance(self.saved_conjuror_data.__dict__[attribute], str):
-                g.write(attribute + ": " + '"' + self.saved_conjuror_data.__dict__[attribute] + '"' + '\n')
+                g.write(attribute + ": " + "'''" +
+                        self.saved_conjuror_data.__dict__[attribute].replace('\n', 'ZELL/n') + "'''" + '\n')
             elif isinstance(self.saved_conjuror_data.__dict__[attribute], (int, bool)):
                 g.write(attribute + ": " + str(self.saved_conjuror_data.__dict__[attribute]) + '\n')
             elif isinstance(self.saved_conjuror_data.__dict__[attribute], list):
@@ -2356,14 +2390,14 @@ Winning Conditions:
                         if isinstance(item, (int, bool)):
                             g.write(str(item))
                         elif isinstance(item, str):
-                            g.write(str(item))
+                            g.write(item.replace('\n', 'ZELL/n'))
                         elif isinstance(item, role.Player):
                             g.write("Player(" + str(item.gamenum) + ')')
                     else:
                         if isinstance(item, (int, bool)):
                             g.write(str(item) + ', ')
                         elif isinstance(item, str):
-                            g.write(str(item) + ', ')
+                            g.write(item.replace('\n', 'ZELL/n') + ', ')
                         elif isinstance(item, role.Player):
                             g.write("Player(" + str(item.gamenum) + '), ')
                 g.write(']\n')
@@ -2413,8 +2447,8 @@ Winning Conditions:
             f.close()
         for i, player_file in enumerate(players):
             f = open(output_dir + player_file)
-            f.readline()
-            line = f.readline()
+            f.readline().replace('ZELL/n', '\n')
+            line = f.readline().replace('ZELL/n', '\n')
             while line:
                 if "protected_by" not in line:
                     code = line.replace(": ", " = ")
@@ -2427,13 +2461,13 @@ Winning Conditions:
                     code = code.replace("Player(", "self.role_dictionary[")
                     code = code.replace(")", "]")
                 exec(code)
-                line = f.readline()
+                line = f.readline().replace('ZELL/n', '\n')
             f.close()
         # read the conjuror data
         f = open(output_dir + data + " Conjuror Data.txt")
         self.saved_conjuror_data = role.Conjuror()
-        f.readline()
-        line = f.readline()
+        f.readline().replace('ZELL/n', '\n')
+        line = f.readline().replace('ZELL/n', '\n')
         while line:
             if "protected_by" not in line:
                 code = line.replace(": ", " = ")
@@ -2446,7 +2480,7 @@ Winning Conditions:
                 code = code.replace("Player(", "self.role_dictionary[")
                 code = code.replace(")", "]")
             exec(code)
-            line = f.readline()
+            line = f.readline().replace('ZELL/n', '\n')
         f.close()
         # read in the remaining game attributes, filling in the role data where needed
         self.day_open_tm = ''
@@ -2455,8 +2489,8 @@ Winning Conditions:
         self.night_close_tm = ''
         self.night_open_tm = ''
         f = open(output_dir + data + ".txt")
-        f.readline()
-        line = f.readline()
+        f.readline().replace('ZELL/n', '\n')
+        line = f.readline().replace('ZELL/n', '\n')
         while line:
             code = line.replace(": ", " = ")
             code = "self." + code
@@ -2466,7 +2500,7 @@ Winning Conditions:
                 code = code.replace("Player(", "self.role_dictionary[")
                 code = code.replace(")", "]")
             exec(code)
-            line = f.readline()
+            line = f.readline().replace('ZELL/n', '\n')
         self.day_open_tm = datetime.datetime.strptime(self.day_open_tm, '%Y-%m-%d %H:%M:%S.%f')
         self.day_close_tm = (datetime.datetime.strptime(self.day_close_tm, '%Y-%m-%d %H:%M:%S.%f')
                              + datetime.timedelta(hours=delay))

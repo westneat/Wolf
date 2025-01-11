@@ -1663,7 +1663,7 @@ class BerserkWolf(Player):
 
     def immediate_action(self, messageid, keyword, victims, chat_obj):
         if keyword == 'berserk' and self.mp == 100 and not self.current_thread.open and isinstance(chat_obj, tc.Chat):
-            text = chat_obj.quote_message(messageid) + r"Berserk will be activated tonight."
+            text = chat_obj.quote_message(messageid) + r"Berserk will be activated tonight. "
             if len(victims) > 0:
                 text = text + (f"You will need to vote {victims[0].screenname if self.night > 1 else victims[0].noun}"
                                f" in the normal wolf vote.")
@@ -1675,9 +1675,9 @@ class BerserkWolf(Player):
             self.mp = self.mp - 100
             chat_obj.write_message(chat_obj.quote_message(messageid) + f"The Werewolf Berserk is active.")
             self.berserking = True
-        if victims[0].screenname == 'shortkut' and isinstance(chat_obj, tc.Chat):
-            chat_obj.write_message(f"Wolfbot approves of your desire to murder shortkut, "
-                                   f"but the normal wolf vote must be used.")
+            if victims[0].screenname == 'shortkut' and isinstance(chat_obj, tc.Chat):
+                chat_obj.write_message(f"Wolfbot approves of your desire to murder shortkut, "
+                                       f"but the normal wolf vote must be used.")
         return []
 
     def get_shadow_vote(self, keyword, voted, chat_obj):
