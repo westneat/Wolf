@@ -96,6 +96,10 @@ class Game:
         self.to_skip = []
         self.insti_chat = tc.Chat()
         self.lover_chat = tc.Chat()
+        self.villagers = []
+        self.wolves = []
+        self.solos = []
+        self.wildcards = []
 
     def print_nouns(self):
         bbcode = "[table]"
@@ -232,7 +236,7 @@ class Game:
         # pick number of each category specified
         rsv_roles = [x for x in self.role_ids if x(0).category == "Strong Villager"]
         rrv_roles = [x for x in self.role_ids if x(0).category == "Regular Villager"]
-        rww_roles = [x for x in self.role_ids if x(0).category == "Werewolf"]
+        rww_roles = [x for x in self.role_ids if x(0).category == "Werewolf" and x(0).role != 'Sorcerer']
         rv_roles = [x for x in self.role_ids if x(0).category == "Wildcard"]
         rk_roles = [x for x in self.role_ids if x(0).category == "Solo Killer"]
         roles = []
@@ -294,7 +298,8 @@ class Game:
             if wildcard_obj.role == "Werewolf Fan":
                 while True:
                     rand = random.randint(1, len(self.role_dictionary))
-                    if self.role_dictionary[rand].category == "Werewolf":
+                    if (self.role_dictionary[rand].category == "Werewolf"
+                            and self.role_dictionary[rand].role != 'Sorcerer'):
                         temp[rand-1] = 'Sorcerer'
                         self.role_dictionary[rand] = role.Sorcerer(rand, self.role_dictionary[rand].screenname,
                                                                    self.role_dictionary[rand].noun)
@@ -348,37 +353,24 @@ class Game:
     def day_post(self):
         post_list = sorted(self.player_names, key=lambda v: v.upper())
         tag_list = ''
-        wolves_alive = False
-        villagers_alive = False
-        wildcards_alive = False
-        solos_alive = False
         for i in post_list:
-            if self.role_dictionary[self.name_to_gamenum(i)].alive is True:
+            if self.role_dictionary[self.name_to_gamenum(i)].alive:
                 tag_list = tag_list + '@' + i + '\n'
             else:
                 tag_list = tag_list + '[s]@' + i + '[/s]' + '\n'
-        for j in self.role_dictionary:
-            if self.role_dictionary[j].alive is True:
-                if 'Village' in self.role_dictionary[j].category:
-                    villagers_alive = True
-                elif self.role_dictionary[j].category == 'Werewolf':
-                    wolves_alive = True
-                elif 'Wildcard' in self.role_dictionary[j].category or self.role_dictionary[j].role == 'Werewolf':
-                    wildcards_alive = True
-                elif 'Solo Killer' in self.role_dictionary[j].category:
-                    solos_alive = True
-        text = (f'''The day will start at [TIME=datetime]{self.day_open_tm.strftime('%Y-%m-%dT%H:%M:%S-0500')}[/TIME]
+        rsv_list = [x for x in self.villagers if x.category == 'Strong Villager']
+        text = (f'''The day will start at [TIME=datetime]{self.night_close_tm.strftime('%Y-%m-%dT%H:%M:%S-0500')}[/TIME]
         
         Dictionary: https://gwforums.com/threads/zell-wolf-role-dictionary-and-hall-of-fame.427/
 
 Here's the list of players:
 
 {tag_list}
-And here are the roles:
+And here are the remaining roles:
 
 Village team:
-{self.global_rsv}x Random Strong Villagers
-{self.global_rrv}x Random Regular Villagers
+{len(rsv_list)}x Random Strong Villagers
+{len(self.villagers) - len(rsv_list)}x Random Regular Villagers
 
 ''' +
                 ('Note: There will be NO MORE than one person who has a "speak with the dead" role. '
@@ -386,19 +378,20 @@ Village team:
                  'There may be none of either, but there will not be multiple.') + f'''
 
 Wolf team:
-{self.global_rww}x Random Wolves
+{len(self.wolves)}x Random Wolves
 
 The werewolves can be any of the numbered wolves (except regular werewolf) listed in the dictionary.
 
 Solo team:
-{self.global_rk}x Random Killer
+{len(self.solos)}x Random Killer
 
 Wildcard Role:
-{self.global_rv}x Random Fool/Headhunter/Werewolf Fan/Cupid
+{len(self.wildcards)}x Random Fool/Headhunter/Werewolf Fan/Cupid
 
 If the Werewolf Fan is selected, one wolf will become the Sorcerer.
 
 Rules:
+[spoiler]
 Nights will be 12 hours and days will be 24 hours. The end of the next period will be clearly posted.
 
 You may edit your posts. If you somehow manage to edit out an action before the bot reads it, then it won't count.
@@ -410,10 +403,18 @@ You may edit your posts. If you somehow manage to edit out an action before the 
                  'In the event of a tie, nobody is lynched. '
                  'In the event that the minimum number of votes is not reached, nobody is lynched.\n\n'
                  'Skips require a skip vote from every player. '
-                 'Once you vote to skip, you cannot unskip. You can skip night sessions in the nightly PM chat.') + f'''
+                 'Once you vote to skip, you cannot unskip. You can skip night sessions in the nightly PM chat.\n\n'
+                 'Please do not talk about the game outside of the designated threads. '
+                 'This is honor system. When you die, you will gain access to a special forum that is already set up. '
+                 'One player may have access to this forum at night. '
+                 'If you are revived, you will lose access. '
+                 'Please use this forum for all discussion by dead players about the game. '
+                 'Alive players can talk during the main thread during the day.\n\n'
+                 'It is possible, if very unlikely, for the game to end in a tie if every single player is killed. '
+                 'The game also ends in a tie if there are no deaths for three straight days and nights.') + f'''
 
+[/spoiler]
 Night events will go in the following priority order regardless of when the PMs are sent:
-
 [spoiler]
 Wolf Nightmare activates
 Wolf Shaman activates
@@ -467,29 +468,20 @@ Cupid selection
 
 In the event that two of the same role perform the exact same action, they will both be credited.
 
-''' +
-                ('Please do not talk about the game outside of the designated threads. '
-                 'This is honor system. When you die, you will gain access to a special forum that is already set up. '
-                 'One player may have access to this forum at night. '
-                 'If you are revived, you will lose access. '
-                 'Please use this forum for all discussion by dead players about the game. '
-                 'Alive players can talk during the main thread during the day.\n\n'
-                 'It is possible, if very unlikely, for the game to end in a tie if every single player is killed. '
-                 'The game also ends in a tie if there are no deaths for three straight days and nights.') + f'''
-
 Winning Conditions:
 
 ''' +
-                f"{'[s]' if not villagers_alive else ''}Village: Kill all wolves and the solo killer. "
-                f"{'[/s]' if not villagers_alive else ''}\n\n{'[s]' if not wolves_alive else ''}"
-                f"Wolves: {'[s]' if not solos_alive else ''}Kill the solo killer.{'[/s]' if not solos_alive else ''} "
+                f"{'[s]' if len(self.villagers) == 0 else ''}Village: Kill all wolves and the solo killer. "
+                f"{'[/s]' if len(self.villagers) == 0 else ''}\n\n{'[s]' if len(self.wolves) == 0 else ''}"
+                f"Wolves: {'[s]' if len(self.solos) == 0 else ''}Kill the solo killer."
+                f"{'[/s]' if len(self.solos) == 0 else ''} "
                 f"Afterwards, once the wolves make up half the total players, the wolves win. "
-                f"{'[/s]' if not wolves_alive else ''}\n\n{'[s]' if not solos_alive else ''}"
-                f"Solo Killer: Kill all other players.{'[/s]' if not solos_alive else ''}\n\n"
-                f"{'[s]' if not wildcards_alive else ''}Wildcard Role: Satisfy your winning condition. "
+                f"{'[/s]' if len(self.wolves) == 0 else ''}\n\n{'[s]' if len(self.solos) == 0 else ''}"
+                f"Solo Killer: Kill all other players.{'[/s]' if len(self.solos) == 0 else ''}\n\n"
+                f"{'[s]' if len(self.wildcards) == 0 else ''}Wildcard Role: Satisfy your winning condition. "
                 f"Your winning condition trumps any other that may occur at the same time. "
                 f"(For example, if you lynch the fool and it creates a situation where there are 3 wolves left "
-                f"and 3 villagers, the Fool wins only).{'[/s]' if not wildcards_alive else ''}")
+                f"and 3 villagers, the Fool wins only).{'[/s]' if len(self.wildcards) == 0 else ''}")
         return text
 
     # can be chat or thread pieces passed in
@@ -646,6 +638,7 @@ Winning Conditions:
         bell_ringer_watched_by = old_role.bell_ringer_watched_by
         sheriff_watched_by = old_role.sheriff_watched_by
         preacher_watched_by = old_role.preacher_watched_by
+        category = old_role.category
         doused_by = old_role.doused_by
         disguised_by = old_role.disguised_by
         coupled = old_role.coupled
@@ -702,6 +695,7 @@ Winning Conditions:
         new_role.doused_by = doused_by
         new_role.disguised_by = disguised_by
         new_role.coupled = coupled
+        new_role.category = category
         new_role.concussed = concussed
         new_role.has_been_concussed = has_been_concussed
         new_role.nightmared = nightmared
@@ -748,7 +742,7 @@ Winning Conditions:
         sorc_flag = False
         shadow_flag = False
         for player in self.role_dictionary:
-            if (self.role_dictionary[player].team == 'Wolf' and self.role_dictionary[player].category != 'Wildcard'
+            if (self.role_dictionary[player].team == 'Wolf' and self.role_dictionary[player].role != 'Werewolf Fan'
                     and self.role_dictionary[player].alive):
                 wolves_id.append(self.gamenum_to_memberid(self.role_dictionary[player].gamenum))
                 if self.role_dictionary[player].role == 'Shadow Wolf':
@@ -926,6 +920,7 @@ Winning Conditions:
                                     if (j == 'Witch' and len(self.role_dictionary[attacked].protected_by[j]) > 0
                                             and not blocked):
                                         blocked = True
+                                        self.role_dictionary[attacked].protected_by['Witch'] = []
                                         for blocker in self.role_dictionary[attacked].protected_by[j]:
                                             blocker.has_protect_potion = False
                                             blocker.chat.write_message("You successfully protected a player "
@@ -959,12 +954,14 @@ Winning Conditions:
                                             and not blocked):
                                         blocked = True
                                         self.role_dictionary[attacked].has_forger_shield = 0
+                                        self.role_dictionary[attacked].protected_by['Forger'] = []
                                         self.role_dictionary[attacked].chat.write_message(
                                             "You have been attacked. You no longer have any Forger protection.")
                                 for j in self.role_dictionary[attacked].protected_by:
                                     if (j == 'Beast Hunter' and len(self.role_dictionary[attacked].protected_by[j]) > 0
                                             and not blocked):
                                         blocked = True
+                                        self.role_dictionary[attacked].protected_by['Beast Hunter'] = []
                                         for blocker in self.role_dictionary[attacked].protected_by[j]:
                                             blocker.trap_on = 0
                                             blocker.chat.write_message(
@@ -1054,6 +1051,7 @@ Winning Conditions:
                 if (j == 'Witch' and len(self.role_dictionary[attacked].protected_by[j]) > 0
                         and not blocked):
                     blocked = True
+                    self.role_dictionary[attacked].protected_by[j] = []
                     for blocker in self.role_dictionary[attacked].protected_by[j]:
                         blocker.has_protect_potion = False
                         blocker.chat.write_message("You successfully protected a player "
@@ -1085,6 +1083,7 @@ Winning Conditions:
                 if (j == 'Forger' and len(self.role_dictionary[attacked].protected_by[j]) > 0
                         and not blocked):
                     blocked = True
+                    self.role_dictionary[attacked].protected_by[j] = []
                     self.role_dictionary[attacked].has_forger_shield = 0
                     self.role_dictionary[attacked].chat.write_message(
                         "You have been attacked. You no longer have any Forger protection.")
@@ -1092,6 +1091,7 @@ Winning Conditions:
                 if (j == 'Beast Hunter' and len(self.role_dictionary[attacked].protected_by[j]) > 0
                         and not blocked):
                     blocked = True
+                    self.role_dictionary[attacked].protected_by[j] = []
                     for blocker in self.role_dictionary[attacked].protected_by[j]:
                         blocker.trap_on = 0
                         blocker.chat.write_message(
@@ -1146,6 +1146,15 @@ Winning Conditions:
                 if self.role_dictionary[player].role == 'Instigator':
                     instigators.append(self.gamenum_to_memberid(self.role_dictionary[player].gamenum))
                     self.instigator = self.role_dictionary[player]
+                if self.role_dictionary[player].category == 'Werewolf':
+                    self.wolves.append(self.role_dictionary[player])
+                elif self.role_dictionary[player].category == 'Wildcard':
+                    self.wildcards.append(self.role_dictionary[player])
+                elif self.role_dictionary[player].category == 'Solo Killer':
+                    self.solos.append(self.role_dictionary[player])
+                elif self.role_dictionary[player].category in ['Strong Villager', 'Regular Villager']:
+                    self.villagers.append(self.role_dictionary[player])
+
             if len(instigators) > 0:
                 insti_text = ''
                 for player in self.role_dictionary:
@@ -1190,7 +1199,8 @@ Winning Conditions:
         elif len(self.jailed) == 2:
             body = ("You have been jailed together. ANY messages you send here will be sent verbatim to the warden. "
                     "You have no message limit.")
-            if self.jailed[0].category == 'Werewolf' and self.jailed[1].category == 'Werewolf':
+            if (self.jailed[0].category == 'Werewolf' and self.jailed[1].category == 'Werewolf'
+                    and self.jailed[0].role != 'Sorcerer' and self.jailed[0].category != 'Sorcerer'):
                 body = body + '\n' + '\n' + ('(Since you are both wolves, you make break out of prison by either '
                                              'of you writing "Wolfbot escape" [b]in your individual chat[/b] '
                                              'with Wolfbot (not here).')
@@ -1284,7 +1294,9 @@ Winning Conditions:
                             action_taken = True
                             break
                         if (action == 'escape' and self.jailed[0].category == 'Werewolf'
-                                and self.jailed[1].category == 'Werewolf'):
+                                and self.jailed[0].role != 'Sorcerer'
+                                and self.jailed[1].category == 'Werewolf'
+                                and self.jailed[1].role != 'Sorcerer'):
                             self.role_dictionary[self.jailer].alive = False
                             self.new_thread_text = (self.new_thread_text +
                                                     self.kill_player('breakout',
@@ -1361,7 +1373,8 @@ Winning Conditions:
             if len(self.role_dictionary[player].shamaned_by) > 0:
                 self.role_dictionary[player].shamaned = []
                 self.role_dictionary[player].apparent_aura = self.role_dictionary[player].aura
-                self.role_dictionary[player].apparent_team = self.role_dictionary[player].team
+                if not self.role_dictionary[player].cult:
+                    self.role_dictionary[player].apparent_team = self.role_dictionary[player].team
 
             if len(self.role_dictionary[player].disguised_by) > 0:
                 self.role_dictionary[player].apparent_aura = "Unknown"
@@ -1534,6 +1547,12 @@ Winning Conditions:
         if self.night == 1:
             self.day_thread.write_post(self.print_nouns())
         self.night += 1
+        post_list = sorted(self.player_names, key=lambda v: v.upper())
+        tag_list = ''
+        for i in post_list:
+            if self.role_dictionary[self.name_to_gamenum(i)].alive:
+                tag_list = tag_list + '@' + i + '\n'
+        self.day_thread.write_post(tag_list)
 
     def end_day(self):
         poll_results = {}
@@ -1702,18 +1721,15 @@ Winning Conditions:
                                                                self.role_dictionary[pot_dead])
                         self.day_thread.write_post(text)
                 elif len(outcome) == 3:
-                    if posts[i] != 'private':
+                    if isinstance(objs[i], tc.Thread):
                         self.day_thread.write_post(self.day_thread.quote_post(posts[i]) +
                                                    self.kill_player(outcome[0], outcome[1], outcome[2]))
                     else:
                         self.day_thread.write_post(self.kill_player(outcome[0], outcome[1], outcome[2]))
                 outcome2 = player.shoot_forger_gun(actions[i].lower(), victims[i], self.day_thread)
                 if len(outcome2) == 3:
-                    if posts[i] != 'private':
-                        self.day_thread.write_post(self.day_thread.quote_post(posts[i]) +
-                                                   self.kill_player(outcome2[0], outcome2[1], outcome2[2]))
-                    else:
-                        self.day_thread.write_post(self.kill_player(outcome2[0], outcome2[1], outcome2[2]))
+                    self.day_thread.write_post(self.day_thread.quote_post(posts[i]) +
+                                               self.kill_player(outcome2[0], outcome2[1], outcome2[2]))
                 if (len(outcome) == 1 and outcome[0] == 'shadow'
                         and datetime.datetime.now() < self.day_close_tm - datetime.timedelta(hours=12)):
                     self.shadow_in_effect = True
@@ -1870,6 +1886,18 @@ Winning Conditions:
             victim.tricked_by = []
         if self.confusion_in_effect:
             victim.apparent_role = '??????'
+        if (victim in self.wolves and victim.apparent_role == victim.role
+                and method not in ['corruptor', 'illusionist'] and victim.role != 'Illusionist'):
+            del self.wolves[self.wolves.index(victim)]
+        if (victim in self.villagers and victim.apparent_role == victim.role
+                and method not in ['corruptor', 'illusionist'] and victim.role != 'Illusionist'):
+            del self.villagers[self.villagers.index(victim)]
+        if (victim in self.wildcards and victim.apparent_role == victim.role
+                and method not in ['corruptor', 'illusionist'] and victim.role != 'Illusionist'):
+            del self.wildcards[self.wildcards.index(victim)]
+        if (victim in self.solos and victim.apparent_role == victim.role
+                and method not in ['corruptor', 'illusionist'] and victim.role != 'Illusionist'):
+            del self.solos[self.solos.index(victim)]
         # if victim was watched by the bell ringer
         if len(victim.bell_ringer_watched_by) > 0:
             # watcher is the bell ringer who is getting info
@@ -2225,8 +2253,8 @@ Winning Conditions:
                 insti_count += 1
             if self.role_dictionary[player].category == 'Solo Killer':
                 solo_count += 1
-            if (self.role_dictionary[player].category == 'Wolf' and
-                    self.role_dictionary[player].role not in ['Werewolf Fan', 'Sorcerer']):
+            if (self.role_dictionary[player].category == 'Werewolf' and
+                    self.role_dictionary[player].role != 'Sorcerer'):
                 wolf_count += 1
 
         if trigger == 'Fool':
@@ -2275,7 +2303,7 @@ Winning Conditions:
                       'day_open_tm', 'day_close_tm', 'alch_deaths_tm', 'first_death', 'couple', 'cupid',
                       'instigator', 'confusion_in_effect', 'manual_votes', 'shadow_in_effect', 'shadow_available',
                       'tie_count', 'death', 'game_over', 'night_close_tm', 'night_open_tm', 'cult_chat', 'cultleader',
-                      'to_skip', 'insti_chat', 'lover_chat']
+                      'to_skip', 'insti_chat', 'lover_chat', 'villagers', 'wolves', 'solos', 'wildcards']
         # output master data to csv
         self.master_data.to_csv(f"{output_dir + self.game_title}.csv", index=False)
         # output game attributes to a text file

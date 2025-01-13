@@ -107,6 +107,9 @@ class Player:
         self.mp = 100
         self.screenname = ''
         self.acting_upon = []
+        self.apparent_role = self.role
+        self.apparent_aura = self.aura
+        self.apparent_team = self.team
         self.last_thread_id = 0
         self.chat = tc.Chat()
         self.current_thread = tc.Thread()
@@ -2298,7 +2301,7 @@ class Sorcerer(Player):
         self.hhtargetable = False
         self.wolf_targetable = False
         self.mm_killable = True
-        self.category = 'None'
+        self.category = 'Werewolf'
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
@@ -2684,6 +2687,7 @@ class CultLeader(Player):
         if (keyword == 'convert' and len(victims) == 1 and victims[0].alive and self.gamenum != victims[0].gamenum
                 and not self.current_thread.open and isinstance(chat_obj, tc.Chat)):
             victims[0].cult = True
+            victims[0].apparent_team = "Cult"
             chat_obj.write_message(chat_obj.quote_message(messageid) +
                                    f"You successfully converted {victims[0].screenname} to the cult.")
             victims[0].chat.write_message(f"You have been converted to the cult.")
