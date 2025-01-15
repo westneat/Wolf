@@ -163,7 +163,6 @@ class Thread:
         self.trash = 35
         self.thread_prefix = 60
         self.thread_id = thread_id
-        self.end_in_lynch = False
         if self.thread_id == '':
             self.open = True
         else:
@@ -201,7 +200,11 @@ class Thread:
             "discussion_open": ''
         }
         requests.post(api_url, headers=self.headers, data=payload)
-        self.open = False
+
+    def is_open(self):
+        api_url = f"https://gwforums.com/api/threads/{self.thread_id}"
+        response = requests.get(api_url, headers=self.headers)
+        return json.loads(response.text)['thread']['discussion_open']
 
     def unlock_thread(self):
         api_url = f"https://gwforums.com/api/threads/{self.thread_id}"
@@ -209,7 +212,6 @@ class Thread:
             "discussion_open": True
         }
         requests.post(api_url, headers=self.headers, data=payload)
-        self.open = True
 
     def stick_thread(self):
         api_url = f"https://gwforums.com/api/threads/{self.thread_id}"
@@ -236,7 +238,7 @@ class Thread:
         self.unstick_thread()
         self.move_thread(self.trash)
 
-    def write_post(self, body):
+    def write_message(self, body):
         # [QUOTE="dimmerwit, post: 197510, member: 306"]
         api_url = "https://gwforums.com/api/posts/"
         payload = {
@@ -331,7 +333,7 @@ class Thread:
         self.edit_post(postid, newmessage+message)
 
         # [QUOTE="Zell 17, post: 197915, member: 45"] [/QUOTE]
-    def quote_post(self, postid):
+    def quote_message(self, postid):
         api_url = f"https://gwforums.com/api/posts/{postid}"
         response = requests.get(api_url, headers=self.headers)
         message = json.loads(response.text)['post']['message']
@@ -387,3 +389,48 @@ class Thread:
         #    "poll[max_votes_type]":"single",
         # }
         # response = requests.post(api_url, headers=self.headers, data=payload)
+
+    def get_raw_poll(self):
+        api_url = f"https://gwforums.com/api/threads/{self.thread_id}"
+        response = requests.get(api_url, headers=self.headers)
+        votes = json.loads(response.text)['thread']['Poll']['responses']
+        poll_responses = []
+        vote_receivers = []
+        alive_players = []
+        for i in votes:
+            alive_players.append(votes[i]['text'])
+            if votes[i]['vote_count'] > 0 and votes[i]['text'] != 'No Vote':
+                poll_responses.append(i)
+                vote_receivers.append(votes[i]['text'])
+        options = Options()
+        options.add_argument("--log-level=3")
+        service = Service(r'F:\Python\chromedriver-win64\chromedriver.exe')
+        service.creationflags = CREATE_NO_WINDOW
+        driver = webdriver.Chrome(service=service, options=options)
+        driver.implicitly_wait(100)
+        driver.get(r"https://gwforums.com/forums/forum-only-games.14/")
+        driver.find_element(By.XPATH, r'//*[@id="top"]/div[1]/nav/div/div[3]/div[1]/a[1]/span').click()
+        driver.find_element(By.NAME, "login").send_keys("WolfBot")
+        time.sleep(2)
+        g = open(r"Z:\Password.txt")
+        passwd = g.read()
+        g.close()
+        driver.find_element(By.NAME, "password").send_keys(passwd)
+        driver.find_element(By.XPATH, r'/html/body/div[5]/div/div[2]/div/form/div[1]/dl/dd/div/div[2]/button').click()
+        time.sleep(1)
+        driver.find_element(By.XPATH, r'/html/body/div[2]/ul/li/div/a').click()
+        time.sleep(1)
+        driver.find_element(By.XPATH, r'/html/body/div[2]/ul/li/div/div/div/div[2]/ul/li[3]/a').click()
+        poll_results = {'Name': [], 'Vote Count': []}
+        for i, responseid in enumerate(poll_responses):
+            driver.get(f"https://gwforums.com/threads/{self.thread_id}/poll/results?response={responseid}")
+            poll_item = driver.find_element(By.CLASS_NAME, "block-body")
+            poll_voters = poll_item.find_elements(By.TAG_NAME, "a")
+            votes = []
+            for j in poll_voters:
+                voter = j.get_attribute('textContent')
+                if voter in alive_players and voter != vote_receivers[i]:
+                    votes.append(voter)
+            poll_results['Name'].append(vote_receivers[i])
+            poll_results['Vote Count'].append(len(votes))
+        return poll_results
