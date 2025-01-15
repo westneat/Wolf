@@ -199,6 +199,7 @@ class Thread:
         payload = {
             "discussion_open": ''
         }
+        self.open = False
         requests.post(api_url, headers=self.headers, data=payload)
 
     def is_open(self):
@@ -211,6 +212,7 @@ class Thread:
         payload = {
             "discussion_open": True
         }
+        self.open = True
         requests.post(api_url, headers=self.headers, data=payload)
 
     def stick_thread(self):

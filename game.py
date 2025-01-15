@@ -1017,7 +1017,7 @@ Winning Conditions:
         weakest_wolf_power = 20
         weakest_wolf = role.Player()
         for i in self.role_dictionary:
-            if 0 < self.role_dictionary[i].wolf_order < weakest_wolf_power:
+            if 0 < self.role_dictionary[i].wolf_order < weakest_wolf_power and self.role_dictionary[i].alive:
                 weakest_wolf_power = self.role_dictionary[i].wolf_order
                 weakest_wolf = self.role_dictionary[i]
         # These bypass protection
@@ -1102,9 +1102,7 @@ Winning Conditions:
                         and not blocked):
                     for bh in self.role_dictionary[attacked].protected_by[j]:
                         if not bh.cooldown:
-                            if not blocked:
-                                self.new_thread_text = (self.new_thread_text + self.kill_player(
-                                    "trap", bh, weakest_wolf))
+                            self.new_thread_text = (self.new_thread_text + self.kill_player("trap", bh, weakest_wolf))
                             blocked = True
                             while bh in self.role_dictionary[attacked].protected_by[j]:
                                 delindex = self.role_dictionary[attacked].protected_by[j].index(bh)
@@ -1855,8 +1853,8 @@ Winning Conditions:
             if posters[i].skipped and posters[i] in self.to_skip:
                 del self.to_skip[self.to_skip.index(posters[i])]
             if actions[i].lower() == 'unskipped':
-                chats[i].write_message(chats[i].quote_message(postids) + f"There are {len(self.to_skip)} "
-                                                                         f"people who have yet to skip.")
+                chats[i].write_message(chats[i].quote_message(postids[i]) + f"There are {len(self.to_skip)} "
+                                                                            f"people who have yet to skip.")
             if len(self.to_skip) == 0:
                 self.night_close_tm = datetime.datetime.now()
             self.output_data()
@@ -2130,11 +2128,14 @@ Winning Conditions:
                                            self.kill_player("couple", victim, self.role_dictionary[player]))
         if victim.team == 'Wolf' and victim.role != 'Werewolf Fan':
             self.wolf_chat.close_chat()
-            self.create_wolf_chat()
             wolves_left = []
             for player in self.role_dictionary:
-                if self.role_dictionary[player].team == 'Wolf' and self.role_dictionary[player].role != 'Werewolf Fan':
+                if (self.role_dictionary[player].team == 'Wolf'
+                        and self.role_dictionary[player].role != 'Werewolf Fan'
+                        and self.role_dictionary[player].alive):
                     wolves_left.append(self.role_dictionary[player])
+            if len(wolves_left) > 0:
+                self.create_wolf_chat()
             if len(wolves_left) == 1:
                 wolves_left[0].is_last_evil = True
         if self.day_thread.open:
@@ -2305,17 +2306,17 @@ Winning Conditions:
         for player in self.role_dictionary:
             if self.role_dictionary[player].alive:
                 player_count += 1
-            if self.role_dictionary[player].cult:
-                cult_count += 1
-            if self.role_dictionary[player].coupled:
-                couple_count += 1
-            if self.role_dictionary[player].instigated:
-                insti_count += 1
-            if self.role_dictionary[player].category == 'Solo Killer':
-                solo_count += 1
-            if (self.role_dictionary[player].category == 'Werewolf' and
-                    self.role_dictionary[player].role != 'Sorcerer'):
-                wolf_count += 1
+                if self.role_dictionary[player].cult:
+                    cult_count += 1
+                if self.role_dictionary[player].coupled:
+                    couple_count += 1
+                if self.role_dictionary[player].instigated:
+                    insti_count += 1
+                if self.role_dictionary[player].category == 'Solo Killer':
+                    solo_count += 1
+                if (self.role_dictionary[player].category == 'Werewolf' and
+                        self.role_dictionary[player].role != 'Sorcerer'):
+                    wolf_count += 1
 
         if trigger == 'Fool':
             self.day_thread.write_message("[b]The game is over[/b]. The Fool has won!")
