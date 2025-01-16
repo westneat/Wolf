@@ -30,6 +30,9 @@ def parse_post(text):
     ignore_img = False
     ignore_attach = False
     within_tag = False
+    text = text.replace("[IMG", " [IMG").replace("[/IMG]", "[/IMG] ")
+    text = text.replace("[QUOTE", " [QUOTE").replace("[/QUOTE]", "[/QUOTE] ")
+    text = text.replace("[SPOILER", " [SPOILER").replace("[/SPOILER]", "[/SPOILER] ")
     for i in range(len(text)):
         if not ignore_blockquote and not ignore_img and not ignore_attach and not within_tag:
             if text[i:i+6] == '[QUOTE':
@@ -262,7 +265,7 @@ class Thread:
             for post in posts:
                 items[0].append(post['post_id'])  # what id
                 items[1].append(post['user_id'])  # who posted
-                items[2].append(parse_post(post['message'].replace('[', ' [').replace(']', '] ')))  # what's message
+                items[2].append(parse_post(post['message']))  # what's message
                 items[3].append(post['is_reacted_to'])  # have we seen it before
                 items[4].append(post['post_date'])  # when posted
         return items

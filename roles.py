@@ -1,4 +1,6 @@
 import threadcontrol as tc
+import sys
+import inspect
 
 
 def are_all_alive(actions):
@@ -89,7 +91,22 @@ def print_kill_methods():
         for j in range(2):
             bbcode += f"[td]{kill_methods()[keys[j]][i]}[/td]"
         bbcode += "[/tr]"
+    bbcode += "[/table]"
+    return bbcode
 
+
+def print_roles():
+    bbcode = "[table]"
+    # Add header row
+    bbcode += "[tr][th]Keyword[/th][th]Role Name[/th][/tr]"
+    # Add rows for each dictionary item
+    keys = list(class_list().keys())
+    table_len = len(class_list()[keys[0]])
+    for i in range(table_len):
+        bbcode += "[tr]"
+        for j in range(2):
+            bbcode += f"[td]{class_list()[keys[j]][i]}[/td]"
+        bbcode += "[/tr]"
     bbcode += "[/table]"
     return bbcode
 
@@ -200,6 +217,7 @@ class Player:
         # Blind Wolf / Sorcerer / Wolf Seer
         self.resigned = False
         self.checked = 0
+        self.seen = []
         # Flagger
         self.attacking = 0
         # Tough Guy
@@ -446,7 +464,7 @@ class Jailer(Player):
                 and victims[0].gamenum != self.gamenum and not self.current_thread.open
                 and isinstance(chat_obj, tc.Chat)):
             self.mp = self.mp - 100
-            return ['jail', self, victims[0]]
+            return ['jailer', self, victims[0]]
         return []
 
 
@@ -1324,7 +1342,7 @@ class SpiritSeer(Player):
 
         Wolfbot watch (username) and (username)
 
-        You can select only one player.'''
+        You may select only one player instead of two if you wish.'''
 
     def immediate_action(self, messageid, keyword, victims, chat_obj):
         if (keyword == 'watch' and len(victims) == 2 and victims[0].gamenum != self.gamenum
@@ -2098,10 +2116,22 @@ class WolfScribe(Player):
         self.apparent_team = self.team
         self.apparent_aura = self.aura
         self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
-        Use your ability at any time during the night by posting [b]here[/b]:
+        Use your ability at any time by posting [b]here[/b]:
 
-        Wolfbot kill (username) by (method)
+        Wolfbot scribe (username) by (method) as (role)
+        OR
+        Wolfbot scribe (username) as (role) by (method)
 
+        The role attribute and method attribute are each optional, but one must be present. You can use either:
+        
+        Wolfbot scribe (username) as (role)
+        OR
+        Wolfbot scribe (username) by (method)
+        
+        The bot needs the roles to have no spacing. You can see the list of accepted roles by posting:
+        
+        Wolfbot roles
+        
         You can see a list of death methods by posting:
 
         Wolfbot deaths
@@ -2109,18 +2139,59 @@ class WolfScribe(Player):
 
     def immediate_action(self, messageid, keyword, victims, chat_obj):
         methods = kill_methods()['keyword']
-        if (keyword == 'kill' and self.mp >= 50 and len(victims) == 2 and victims[0].alive
-                and victims[1] in methods and isinstance(chat_obj, tc.Chat)):
-            text = (chat_obj.quote_message(messageid) +
-                    (f"If {victims[0].screenname if self.night > 1 else victims[0].noun}"
-                     f" dies, they will be shown as having been killed by the following method: \n"))
-            text = text + kill_methods()['Cause of Death'][kill_methods()['keyword'].index(victims[1])]
-            chat_obj.write_message(text)
-            self.acting_upon = [victims[0]]
-            victims[0].scribe_method.append(victims[1])
-            victims[0].scribed_by.append(self)
+        deaths = kill_methods()['Cause of Death']
+        classes = class_list()['keyword']
+        names = class_list()['Role Name']
+        if (keyword == 'scribe' and self.mp >= 50 and len(victims) == 3 and isinstance(victims[0], Player)
+                and isinstance(chat_obj, tc.Chat)):
+            if victims[0].alive and victims[1] in methods and victims[2] in classes:
+                ind = classes.index(victims[2])
+                ind2 = methods.index(victims[1])
+                text = (chat_obj.quote_message(messageid) +
+                        (f"If {victims[0].screenname if self.night > 1 else victims[0].noun}"
+                         f" dies, they will be shown as having been [b]{deaths[ind2]}[/b]. "
+                         f"They will also be revealed as the [b]{names[ind]}[/b]."))
+                chat_obj.write_message(text)
+                self.acting_upon = [victims[0]]
+                victims[0].scribe_method.append([victims[1], victims[2]])
+                victims[0].scribed_by.append(self)
+            elif victims[0].alive and victims[2] in methods and victims[1] in classes:
+                ind = classes.index(victims[1])
+                ind2 = methods.index(victims[2])
+                text = (chat_obj.quote_message(messageid) +
+                        (f"If {victims[0].screenname if self.night > 1 else victims[0].noun}"
+                         f" dies, they will be shown as having been [b]{deaths[ind2]}[/b]. "
+                         f"They will also be revealed as the [b]{names[ind]}[/b]."))
+                chat_obj.write_message(text)
+                self.acting_upon = [victims[0]]
+                victims[0].scribe_method.append([victims[2], victims[1]])
+                victims[0].scribed_by.append(self)
+        elif (keyword == 'scribe' and self.mp >= 50 and len(victims) == 2 and isinstance(victims[0], Player)
+                and isinstance(chat_obj, tc.Chat)):
+            if victims[0].alive and victims[1] in methods:
+                ind2 = methods.index(victims[1])
+                text = (chat_obj.quote_message(messageid) +
+                        (f"If {victims[0].screenname if self.night > 1 else victims[0].noun}"
+                         f" dies, they will be shown as having been [b]{deaths[ind2]}[/b]. "
+                         f"They will also be revealed as their normal role."))
+                chat_obj.write_message(text)
+                self.acting_upon = [victims[0]]
+                victims[0].scribe_method.append([victims[1], ''])
+                victims[0].scribed_by.append(self)
+            elif victims[0].alive and victims[1] in classes:
+                ind = classes.index(victims[1])
+                text = (chat_obj.quote_message(messageid) +
+                        (f"If {victims[0].screenname if self.night > 1 else victims[0].noun}"
+                         f" dies, they will be shown as being killed normally. "
+                         f"They will also be revealed as the [b]{names[ind]}[/b]."))
+                chat_obj.write_message(text)
+                self.acting_upon = [victims[0]]
+                victims[0].scribe_method.append(['', victims[1]])
+                victims[0].scribed_by.append(self)
         if keyword == 'deaths' and isinstance(chat_obj, tc.Chat):
             chat_obj.write_message(chat_obj.quote_message(messageid) + print_kill_methods())
+        if keyword == 'roles' and isinstance(chat_obj, tc.Chat):
+            chat_obj.write_message(chat_obj.quote_message(messageid) + print_roles())
         return []
 
     def get_shadow_vote(self, keyword, voted, chat_obj):
@@ -2329,10 +2400,16 @@ class Sorcerer(Player):
             self.chat.write_message(f"{victims[0].screenname if self.night > 1 else victims[0].noun}"
                                     f" is the {victims[0].role}.")
             self.checked = self.checked + 1
+            self.seen.append(victims[0])
             if len(victims[0].infected_by) > 0:
                 self.infected_by = victims[0].infected_by.copy()
                 self.chat.write_message(
                     f"You have been infected and will die at the end of the day if the Infector is not killed.")
+        if (keyword == 'reveal' and len(victims) == 1 and victims[0].alive and isinstance(chat_obj, tc.Chat)
+                and victims[0].wolf_targetable and self.mp >= 50 and not self.resigned
+                and self.current_thread.open and not self.concussed and victims[0] in self.seen):
+            self.mp -= 50
+            return ['reveal', victims[0]]
         if (keyword == 'resign' and isinstance(chat_obj, tc.Chat)) or self.is_last_evil:
             self.chat.write_message(f"You have resigned your powers and may participate in wolf chat.")
             self.resigned = True
@@ -2946,3 +3023,13 @@ class SerialKiller(Player):
                     self.has_killed = True
             return ['stabbed', self, deaths]
         return []
+
+
+def class_list():
+    clsmembers = inspect.getmembers(sys.modules[__name__], inspect.isclass)
+    classes = []
+    names = []
+    for member in clsmembers:
+        classes.append(member[0])
+        names.append(member[1]().role)
+    return {'keyword': classes, 'Role Name': names}
