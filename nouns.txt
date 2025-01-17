@@ -108,14 +108,12 @@ medicine
 philosophy
 teacher
 communication
-night
 chemistry
 disease
 disk
 energy
 nation
 road
-role
 soup
 advertising
 location
@@ -166,7 +164,6 @@ appearance
 association
 concept
 customer
-death
 discussion
 housing
 inflation
@@ -206,7 +203,6 @@ passion
 percentage
 resource
 setting
-ad
 agency
 college
 connection
@@ -384,7 +380,6 @@ reception
 replacement
 revolution
 river
-son
 speech
 tea
 village

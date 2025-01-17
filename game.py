@@ -18,6 +18,37 @@ keywords = ["arm", "visit", "check", "convert", "corrupt", "couple", "deaths", "
 output_dir = r"Games\\"
 
 
+def export(value):
+    if isinstance(value, str):
+        # f.write(attribute + ": " + "'''" + self.__dict__[attribute].replace('\n', 'ZELL/n') + "'''" + '\n')
+        return "'''" + value.replace('\n', 'ZELL/n') + "'''"
+    elif isinstance(value, (int, bool)):
+        return str(value)
+    elif isinstance(value, tc.Chat):
+        return "tc.Chat(" + str(value.conv_id) + ')'
+    elif isinstance(value, tc.Thread):
+        return "tc.Thread(" + str(value.thread_id) + ')'
+    elif isinstance(value, datetime.datetime):
+        return '"' + str(value) + '"'
+    elif isinstance(value, role.Player):
+        return "Player(" + str(value.gamenum) + ')'
+    elif isinstance(value, list):
+        text = "["
+        for i, item in enumerate(value):
+            if i == len(value) - 1:
+                text = text + export(item)
+            else:
+                text = text + export(item) + ','
+        return text + ']'
+    elif isinstance(value, dict):
+        text = "{"
+        for key in value:
+            text = text + export(key) + ":" + export(value[key]) + ","
+        return text + "}"
+    else:
+        return ''
+
+
 # test data
 # [47, 157, 62, 101, 95, 65, 7, 40, 4, 8, 100, 82, 54, 67, 306, 18]
 # Game object is responsible to manipulation of the game states
@@ -519,7 +550,8 @@ Winning Conditions:
                             if "ZELLWOLFBOTID" in temp[j]:
                                 users.append(self.role_dictionary[self.name_to_gamenum(
                                     self.player_names_dict[int(temp[j][13:])])])
-                            elif temp[j] in role.kill_methods()['keyword'] or temp[j] in role.class_list()['keyword']:
+                            elif (temp[j].lower() in [x.lower() for x in role.kill_methods()['keyword']]
+                                  or temp[j].lower() in [x.lower() for x in role.class_list()['keyword']]):
                                 users.append(temp[j])
                             else:
                                 break
@@ -691,11 +723,12 @@ Winning Conditions:
         black_potion = old_role.black_potion
         spelled = old_role.spelled
         scribed_by = old_role.scribed_by
+        scribe_method = old_role.scribe_method
         shadow = old_role.shadow
         shamaned_by = old_role.shamaned_by
         has_killed = old_role.has_killed
         poisoned = old_role.poisoned
-        lynchable = old_role.lynchable
+        unlynchable_by = old_role.unlynchable_by
         mp = old_role.mp
         screenname = old_role.screenname
         last_thread_id = old_role.last_thread_id
@@ -727,6 +760,7 @@ Winning Conditions:
         new_role.corrupted_by = corrupted_by.copy()
         new_role.cult = cult
         new_role.scribed_by = scribed_by.copy()
+        new_role.scribe_method = scribe_method.copy()
         new_role.infected_by = infected_by.copy()
         new_role.instigated = instigated
         new_role.action_used = action_used
@@ -749,7 +783,7 @@ Winning Conditions:
         new_role.shamaned_by = shamaned_by.copy()
         new_role.has_killed = has_killed
         new_role.poisoned = poisoned
-        new_role.lynchable = lynchable
+        new_role.unlynchable_by = unlynchable_by
         new_role.mp = mp
         new_role.screenname = screenname
         new_role.last_thread_id = last_thread_id
@@ -1231,6 +1265,9 @@ Winning Conditions:
                      f"You have no message limit.")
             self.jailer_chat.create_conversation("On Duty", body2,
                                                  [self.gamenum_to_memberid(self.jailer)])
+            if self.jailed[0].team == 'Wolf' and self.jailed[0].role != 'Werewolf Fan':
+                self.wolf_chat.write_message(f"{self.jailed[0].screenname} has been jailed tonight and "
+                                             f"cannot participate in wolf chat.")
         elif len(self.jailed) == 2:
             body = ("You have been jailed together. ANY messages you send here will be sent verbatim to the warden. "
                     "You have no message limit.")
@@ -1247,11 +1284,19 @@ Winning Conditions:
                      f"To drop the weapon, do so in your original role PM")  # BW - IS THIS NECESSARY?
             self.jailer_chat.create_conversation("On Duty", body2,
                                                  [self.gamenum_to_memberid(self.jailer)])
+            if self.jailed[0].team == 'Wolf' and self.jailed[0].role != 'Werewolf Fan':
+                self.wolf_chat.write_message(f"{self.jailed[0].screenname} has been jailed tonight and "
+                                             f"cannot participate in wolf chat unless freed.")
+            if self.jailed[1].team == 'Wolf' and self.jailed[1].role != 'Werewolf Fan':
+                self.wolf_chat.write_message(f"{self.jailed[1].screenname} has been jailed tonight and "
+                                             f"cannot participate in wolf chat unless freed.")
 
         # Iterate through all players to initialize game
         for player in self.role_dictionary:
             if self.role_dictionary[player].role in ['Jelly Wolf', 'Bell Ringer']:
                 self.role_dictionary[player].acting_upon = []
+            if self.role_dictionary[player].role == 'Serial Killer':
+                self.role_dictionary[player].mp += 100
             self.role_dictionary[player].jellied_by = []
             self.role_dictionary[player].bell_ringer_watched_by = []
             self.role_dictionary[player].skipped = False
@@ -1305,9 +1350,7 @@ Winning Conditions:
                 self.confusion_in_effect = True
         self.win_conditions()
         # PHASE 2 (Wolves break out of warden prison or warden weapon used, moved to nightly check
-        # BW REWRITE LOOP NOT NECESSARY
 
-        self.win_conditions()
         # PHASE 3 No wolf checks, those are under immediate action in the night loop
         self.phased_actions(['Voodoo Wolf', 'Librarian', 'Medium', 'Ritualist'])
         self.win_conditions()
@@ -1475,7 +1518,7 @@ Winning Conditions:
             self.role_dictionary[player].concussed = False
             self.role_dictionary[player].nightmared = False
             self.role_dictionary[player].jailed = False
-            self.role_dictionary[player].lynchable = True
+            self.role_dictionary[player].unlynchable_by = []
             self.role_dictionary[player].sheriff_watched_by = []
             self.role_dictionary[player].preacher_watched_by = []
             self.role_dictionary[player].protected_by['Flagger'] = []
@@ -1558,7 +1601,6 @@ Winning Conditions:
 
     def end_day(self):
         poll_results = {}
-        self.day_thread.lock_thread()
         if not self.shadow_in_effect:
             # Run Preacher check to see if there are any more votes out there
             self.phased_actions(['Preacher'])
@@ -1612,7 +1654,7 @@ Winning Conditions:
                 if len(vote_winners) != 1 or top_vote < lynch_threshold:
                     self.day_thread.write_message("The village could not decide who to lynch.")
                     self.phased_actions(['Judge'])
-                elif not vote_winner.lynchable:
+                elif len(vote_winner.unlynchable_by) > 0:
                     self.day_thread.write_message(f"The village attempting to lynch {vote_winner.screenname}, "
                                                   f"but their lynch was prevented by a mysterious power.")
                     for flower in self.role_dictionary:
@@ -1620,7 +1662,7 @@ Winning Conditions:
                                 and vote_winner in self.role_dictionary[flower].acting_upon):
                             self.role_dictionary[flower].acting_upon = []
                             self.role_dictionary[flower].mp = 0
-                            vote_winner.lynchable = True
+                            vote_winner.unlynchable_by = []
                 else:
                     self.secondary_text = ''
                     self.day_thread.write_message(self.kill_player("lynched", role.Player(), vote_winner))
@@ -1643,6 +1685,7 @@ Winning Conditions:
         self.phased_actions(['Shaman Wolf'])
         self.phased_actions(['Nightmare Wolf'])
         self.phased_actions(['Jailer', 'Warden'])
+        self.day_thread.lock_thread()
         self.shadow_in_effect = False
         if not self.death:
             self.tie_count += 1
@@ -1801,71 +1844,89 @@ Winning Conditions:
                     if reacts[i] is False:
                         cultee.chat.write_message("From the Cult Leader: " + message)
         if len(self.jailed) == 1:
-            [_, posters, posts, reacts, _] = self.jailee_chat.convo_pieces()
+            [postids, posters, posts, reacts, _] = self.jailee_chat.convo_pieces()
             for i in range(len(posters)-1, -1, -1):
                 if posters[i] == bot_member_id:
+                    del postids[i]
                     del posters[i]
                     del posts[i]
                     del reacts[i]
             for i, message in enumerate(posts):
                 if reacts[i] is False:
                     self.jailer_chat.write_message("From your prisoner: " + message)
-            [_, posters, posts, reacts, _] = self.jailer_chat.convo_pieces()
+                    self.jailee_chat.seen_message(postids[i])
+            [postids, posters, posts, reacts, _] = self.jailer_chat.convo_pieces()
             for i in range(len(posters)-1, -1, -1):
                 if posters[i] == bot_member_id:
+                    del postids[i]
                     del posters[i]
                     del posts[i]
                     del reacts[i]
             for i, message in enumerate(posts):
                 if reacts[i] is False:
                     self.jailee_chat.write_message("From the Jailer: " + message)
+                    self.jailer_chat.seen_message(postids[i])
         if len(self.jailed) == 2:
             if not self.jailed[0].alive or not self.jailed[1].alive:
                 self.jailed = []
             else:
-                [_, posters, posts, reacts, _] = self.jailee_chat.convo_pieces()
+                [postids, posters, posts, reacts, _] = self.jailee_chat.convo_pieces()
                 for i in range(len(posters) - 1, -1, -1):
                     if posters[i] == bot_member_id:
+                        del postids[i]
                         del posters[i]
                         del posts[i]
                         del reacts[i]
                 for i, message in enumerate(posts):
                     if reacts[i] is False:
-                        self.jailer_chat.write_message(f"From prison, {posters[i].screenname} says: " + message)
+                        self.jailer_chat.write_message(f"From prison, {self.memberid_to_name(posters[i])} says: "
+                                                       + message)
+                        self.jailee_chat.seen_message(postids[i])
                 action_taken = False
                 for i in range(2):
                     if not action_taken:
-                        [_, _, actions, _, _] = self.get_keyword_phrases(self.jailed[i].chat.convo_pieces())
+                        pieces = self.jailed[i].chat.convo_pieces()
+                        chats = [self.jailed[i].chat for _ in pieces[0]]
+                        pieces.append(chats)
+                        [_, _, actions, _, _, _] = self.get_keyword_phrases(pieces)
                         for action in actions:
                             if action == 'kill' and self.jailed[i].given_warden_weapon:
+                                survivor = role.Player()
                                 if self.jailed[i].role == 'Werewolf Fan':
                                     self.secondary_text = ''
                                     self.new_thread_text = (self.new_thread_text +
                                                             self.kill_player('prisoner',
                                                                              self.jailed[i],
                                                                              self.jailed[1-i]))
+                                    survivor = self.jailed[i]
                                 elif self.jailed[1-i].role == 'Werewolf Fan':
                                     self.secondary_text = ''
                                     self.new_thread_text = (self.new_thread_text +
                                                             self.kill_player('prisoner',
                                                                              self.jailed[1-i],
                                                                              self.jailed[i]))
+                                    survivor = self.jailed[1-i]
                                 elif self.jailed[i].team == self.jailed[1-i].team:
                                     self.secondary_text = ''
                                     self.new_thread_text = (self.new_thread_text +
                                                             self.kill_player('prisoner',
                                                                              self.jailed[1-i],
                                                                              self.jailed[i]))
+                                    survivor = self.jailed[1-i]
                                 elif self.jailed[i].team != self.jailed[1-i].team:
                                     self.secondary_text = ''
                                     self.new_thread_text = (self.new_thread_text +
                                                             self.kill_player('prisoner',
                                                                              self.jailed[i],
                                                                              self.jailed[1-i]))
+                                    survivor = self.jailed[i]
                                 self.jailed[0].jailed = False
                                 self.jailed[1].jailed = False
-                                self.jailer_chat.write_message("Chat is Closed.")
-                                self.jailee_chat.write_message("Chat is Closed.")
+                                self.jailer_chat.write_message("Chat is Closed. "
+                                                               "One of the prisoners has used the weapon.")
+                                self.jailee_chat.write_message(f"Chat is Closed.{survivor.screenname} has survived "
+                                                               f"and is free from jailing restrictions to perform "
+                                                               f"night actions as usual.")
                                 self.jailee_chat.close_chat()
                                 self.jailer_chat.close_chat()
                                 self.jailed = []
@@ -1886,8 +1947,8 @@ Winning Conditions:
                                 self.jailed[0].has_killed = True
                                 self.jailed[1].has_killed = True
                                 action_taken = True
-                                self.jailer_chat.write_message("Chat is Closed.")
-                                self.jailee_chat.write_message("Chat is Closed.")
+                                self.jailer_chat.write_message("Chat is Closed. Sorry, you jailed two wolves.")
+                                self.jailee_chat.write_message("Chat is Closed. You are free of jailing restrictions.")
                                 self.jailee_chat.close_chat()
                                 self.jailer_chat.close_chat()
                                 self.jailed = []
@@ -1941,7 +2002,7 @@ Winning Conditions:
         for i in range(len(postids)):
             if posters[i].alive:
                 posters[i].skip_check(actions[i].lower(), postids[i], chats[i])
-            if posters[i].alive and not posters[i].jailed and not posters[i].concussed and not posters[i].nightmared:
+            if posters[i].alive and not posters[i].concussed and not posters[i].nightmared:
                 if posters[i].role == 'Violinist':
                     victims[i].append(self.first_death)
                 outcome = posters[i].immediate_action(postids[i], actions[i].lower(), victims[i], chats[i])
@@ -1989,13 +2050,14 @@ Winning Conditions:
             return 'The Alpha Wolf has been attacked.'
         if len(victim.scribed_by) > 0:
             scribe_data = victim.scribe_method[-1]  # Take most recent scribed info
-            method = scribe_data[0]
+            if scribe_data[0] != '':
+                method = scribe_data[0]
             scribe_role = scribe_data[1]
             if scribe_role != '':
                 victim.apparent_role = scribe_role
-            wolf_scribe = self.role_dictionary[victim.scribed_by[-1]]  # Who is responsible for the scribing
+            wolf_scribe = victim.scribed_by[-1]  # Who is responsible for the scribing
             wolf_scribe.mp = wolf_scribe.mp - 50  # Deduct their MP
-            del victim.scribed[-1]  # Clean up
+            del victim.scribe_method[-1]  # Clean up
             del victim.scribed_by[-1]  # Clean up
         # Victim gets most attributes reset
         victim.alive = False
@@ -2026,7 +2088,7 @@ Winning Conditions:
         victim.shamaned_by = []
         victim.has_killed = False
         victim.poisoned = False
-        victim.lynchable = True
+        victim.unlynchable_by = []
         if len(victim.tricked_by) > 0:
             victim.apparent_role = 'Wolf Trickster'
             for wolf in victim.tricked_by:
@@ -2196,9 +2258,10 @@ Winning Conditions:
             victim.acting_upon = []
         elif victim.role == 'Wolf Scribe':
             if len(victim.acting_upon) > 0:
-                delindex = victim.acting_upon[0].scribed_by.index(victim)
-                del victim.acting_upon[0].scribed_by[delindex]
-                del victim.acting_upon[0].scribe_method[delindex]
+                while victim in victim.acting_upon[0].scribed_by:
+                    delindex = victim.acting_upon[0].scribed_by.index(victim)
+                    del victim.acting_upon[0].scribed_by[delindex]
+                    del victim.acting_upon[0].scribe_method[delindex]
             victim.acting_upon = []
         elif victim.role == 'Wolf Trickster':
             if len(victim.acting_upon) > 0:
@@ -2478,38 +2541,7 @@ Winning Conditions:
         # output game attributes to a text file
         f = open(f"{output_dir + self.game_title}.txt", 'w')
         for attribute in attributes:
-            if isinstance(self.__dict__[attribute], str):
-                f.write(attribute + ": " + "'''" + self.__dict__[attribute].replace('\n', 'ZELL/n') + "'''" + '\n')
-            elif isinstance(self.__dict__[attribute], (int, bool)):
-                f.write(attribute + ": " + str(self.__dict__[attribute]) + '\n')
-            elif isinstance(self.__dict__[attribute], list):
-                f.write(attribute + ": [")
-                for i, item in enumerate(self.__dict__[attribute]):
-                    if i == len(self.__dict__[attribute]) - 1:
-                        if isinstance(item, (int, bool)):
-                            f.write(str(item))
-                        elif isinstance(item, str):
-                            f.write(str(item.replace('\n', 'ZELL/n')))
-                        elif isinstance(item, role.Player):
-                            f.write("Player(" + str(item.gamenum) + ')')
-                    else:
-                        if isinstance(item, (int, bool)):
-                            f.write(str(item) + ', ')
-                        elif isinstance(item, str):
-                            f.write(str(item.replace('\n', 'ZELL/n')) + ', ')
-                        elif isinstance(item, role.Player):
-                            f.write("Player(" + str(item.gamenum) + '), ')
-                f.write(']\n')
-            elif isinstance(self.__dict__[attribute], tc.Chat):
-                f.write(attribute + ": tc.Chat(" + str(self.__dict__[attribute].conv_id) + ')\n')
-            elif isinstance(self.__dict__[attribute], tc.Thread):
-                f.write(attribute + ": tc.Thread(" + str(self.__dict__[attribute].thread_id) + ')\n')
-            elif isinstance(self.__dict__[attribute], datetime.datetime):
-                f.write(attribute + ": " + '"' + str(self.__dict__[attribute]) + '"' + '\n')
-            elif isinstance(self.__dict__[attribute], role.Player):
-                f.write(attribute + ": Player(" + str(self.__dict__[attribute].gamenum) + ')\n')
-            else:
-                f.write(attribute + ": " + '\n')
+            f.write(attribute + ": " + export(self.__dict__[attribute]) + '\n')
         f.close()
         # output each player's attributes to individual text files
         attributes = []
@@ -2523,57 +2555,8 @@ Winning Conditions:
             del attributes[attributes.index('initial_PM')]
             del attributes[attributes.index('current_thread')]
             for attribute in attributes:
-                if isinstance(self.role_dictionary[player].__dict__[attribute], str):
-                    g.write(attribute + ": " + "'''" +
-                            self.role_dictionary[player].__dict__[attribute].replace('\n', 'ZELL/n') + "'''" + '\n')
-                elif isinstance(self.role_dictionary[player].__dict__[attribute], (int, bool)):
-                    g.write(attribute + ": " + str(self.role_dictionary[player].__dict__[attribute]) + '\n')
-                elif isinstance(self.role_dictionary[player].__dict__[attribute], list):
-                    g.write(attribute + ": [")
-                    for i, item in enumerate(self.role_dictionary[player].__dict__[attribute]):
-                        if i == len(self.role_dictionary[player].__dict__[attribute]) - 1:
-                            if isinstance(item, (int, bool)):
-                                g.write(str(item))
-                            elif isinstance(item, str):
-                                g.write(item.replace('\n', 'ZELL/n'))
-                            elif isinstance(item, role.Player):
-                                g.write("Player(" + str(item.gamenum) + ')')
-                        else:
-                            if isinstance(item, (int, bool)):
-                                g.write(str(item) + ', ')
-                            elif isinstance(item, str):
-                                g.write(item.replace('\n', 'ZELL/n') + ', ')
-                            elif isinstance(item, role.Player):
-                                g.write("Player(" + str(item.gamenum) + '), ')
-                    g.write(']\n')
-                elif isinstance(self.role_dictionary[player].__dict__[attribute], tc.Chat):
-                    g.write(attribute + ": tc.Chat(" + str(self.role_dictionary[player].__dict__[attribute].conv_id)
-                            + ')\n')
-                elif isinstance(self.role_dictionary[player].__dict__[attribute], tc.Thread):
-                    g.write(attribute + ": tc.Thread(" + str(self.role_dictionary[player].__dict__[attribute].thread_id)
-                            + ')\n')
-                elif isinstance(self.role_dictionary[player].__dict__[attribute], datetime.datetime):
-                    g.write(attribute + ": " + '"' + str(self.role_dictionary[player].__dict__[attribute]) + '"' + '\n')
-                elif isinstance(self.role_dictionary[player].__dict__[attribute], role.Player):
-                    g.write(attribute + ": Player(" + str(self.role_dictionary[player].__dict__[attribute].gamenum)
-                            + ')\n')
-                elif isinstance(self.role_dictionary[player].__dict__[attribute], dict):
-                    g.write(attribute + ": {")
-                    for key in self.role_dictionary[player].__dict__[attribute]:
-                        if isinstance(key, str):
-                            g.write("'" + key + "'" + ": [")
-                            for obj in self.role_dictionary[player].__dict__[attribute][key]:
-                                g.write("Player(" + str(obj.gamenum) + '), ')
-                            g.write("],")
-                        elif isinstance(key, int):
-                            g.write(str(key) + ": [")
-                            for obj in self.role_dictionary[player].__dict__[attribute][key]:
-                                g.write("Player(" + str(obj.gamenum) + '), ')
-                            g.write("],")
-                    g.write("}\n")
-                else:
-                    g.write(attribute + ": " + '\n')
-                attributes = []
+                g.write(attribute + ": " + export(self.role_dictionary[player].__dict__[attribute]) + '\n')
+            attributes = []
             g.close()
         # output the saved conjuror data just in case
         g = open(f"{output_dir + self.game_title} Conjuror Data.txt", 'w')
@@ -2583,54 +2566,7 @@ Winning Conditions:
         del attributes[attributes.index('initial_PM')]
         del attributes[attributes.index('current_thread')]
         for attribute in attributes:
-            if isinstance(self.saved_conjuror_data.__dict__[attribute], str):
-                g.write(attribute + ": " + "'''" +
-                        self.saved_conjuror_data.__dict__[attribute].replace('\n', 'ZELL/n') + "'''" + '\n')
-            elif isinstance(self.saved_conjuror_data.__dict__[attribute], (int, bool)):
-                g.write(attribute + ": " + str(self.saved_conjuror_data.__dict__[attribute]) + '\n')
-            elif isinstance(self.saved_conjuror_data.__dict__[attribute], list):
-                g.write(attribute + ": [")
-                for i, item in enumerate(self.saved_conjuror_data.__dict__[attribute]):
-                    if i == len(self.saved_conjuror_data.__dict__[attribute]) - 1:
-                        if isinstance(item, (int, bool)):
-                            g.write(str(item))
-                        elif isinstance(item, str):
-                            g.write(item.replace('\n', 'ZELL/n'))
-                        elif isinstance(item, role.Player):
-                            g.write("Player(" + str(item.gamenum) + ')')
-                    else:
-                        if isinstance(item, (int, bool)):
-                            g.write(str(item) + ', ')
-                        elif isinstance(item, str):
-                            g.write(item.replace('\n', 'ZELL/n') + ', ')
-                        elif isinstance(item, role.Player):
-                            g.write("Player(" + str(item.gamenum) + '), ')
-                g.write(']\n')
-            elif isinstance(self.saved_conjuror_data.__dict__[attribute], tc.Chat):
-                g.write(attribute + ": tc.Chat(" + str(self.saved_conjuror_data.__dict__[attribute].conv_id) + ')\n')
-            elif isinstance(self.saved_conjuror_data.__dict__[attribute], tc.Thread):
-                g.write(attribute + ": tc.Thread(" + str(self.saved_conjuror_data.__dict__[attribute].thread_id) +
-                        ')\n')
-            elif isinstance(self.saved_conjuror_data.__dict__[attribute], datetime.datetime):
-                g.write(attribute + ": " + '"' + str(self.saved_conjuror_data.__dict__[attribute]) + '"' + '\n')
-            elif isinstance(self.saved_conjuror_data.__dict__[attribute], role.Player):
-                g.write(attribute + ": Player(" + str(self.saved_conjuror_data.__dict__[attribute].gamenum) + ')\n')
-            elif isinstance(self.saved_conjuror_data.__dict__[attribute], dict):
-                g.write(attribute + ": {")
-                for key in self.saved_conjuror_data.__dict__[attribute]:
-                    if isinstance(key, str):
-                        g.write("'" + key + "'" + ": [")
-                        for obj in self.saved_conjuror_data.__dict__[attribute][key]:
-                            g.write("Player(" + str(obj.gamenum) + '), ')
-                        g.write("],")
-                    elif isinstance(key, int):
-                        g.write(str(key) + ": [")
-                        for obj in self.saved_conjuror_data.__dict__[attribute][key]:
-                            g.write("Player(" + str(obj.gamenum) + '), ')
-                        g.write("],")
-                g.write("}\n")
-            else:
-                g.write(attribute + ": " + '\n')
+            g.write(attribute + ": " + export(self.saved_conjuror_data.__dict__[attribute]) + '\n')
         g.close()
 
     def resume(self, data, delay=0):
