@@ -134,6 +134,7 @@ class Game:
         self.solos = []
         self.wildcards = []
         self.secondary_text = ''
+        self.dead_speaker = role.Player()
 
     def print_nouns(self):
         bbcode = "[table]"
@@ -864,7 +865,9 @@ Winning Conditions:
         pieces = [messageids, userids, messages, reacted, time, chat]
         [postids, posters, actions, victims, times, chats] = self.get_keyword_phrases(pieces, dedupe=True)
         for i in range(len(postids)):
-            if (posters[i].role in rolelist and posters[i].alive and not posters[i].jailed
+            if (posters[i].role in rolelist and not posters[i].jailed and
+                    (posters[i].alive or (posters[i].role in ['Librarian', 'Voodoo Wolf'])
+                     and posters[i].night_killed == self.night)
                     and not posters[i].concussed and not posters[i].nightmared and
                     datetime.datetime.fromtimestamp(times[i]) > self.day_open_tm):
                 if posters[i].role == 'Violinist':
@@ -873,6 +876,12 @@ Winning Conditions:
                 if len(outcome) == 3:
                     self.secondary_text = ''
                     self.new_thread_text = self.new_thread_text + self.kill_player(outcome[0], outcome[1], outcome[2])
+            elif posters[i].jailed:
+                posters[i].chat.write_message("You are still jailed and cannot act tonight.")
+            elif posters[i].concussed:
+                posters[i].chat.write_message("You are concussed and cannot act tonight.")
+            elif posters[i].nightmared:
+                posters[i].chat.write_message("You are in a deep sleep (nightmared) and cannot act tonight.")
 
     def solo_attack(self, rolelist):
         # Go through all players, but we only care about the solo killers
@@ -1205,6 +1214,8 @@ Winning Conditions:
             # Set up Instigator Chat
             instigators = []  # holds member ids
             for player in self.role_dictionary:
+                if self.role_dictionary[player].speak_with_dead:
+                    self.dead_speaker = self.role_dictionary[player]
                 if self.role_dictionary[player].role == 'Instigator':
                     instigators.append(self.gamenum_to_memberid(self.role_dictionary[player].gamenum))
                     self.instigator = self.role_dictionary[player]
@@ -1534,9 +1545,6 @@ Winning Conditions:
             self.role_dictionary[player].poisoned = False
             self.role_dictionary[player].given_warden_weapon = False
             self.role_dictionary[player].visited = []
-            # remove "old" mute so they are eligible to be muted again the next night.
-            if self.role_dictionary[player].role in ['Voodoo Wolf', 'Librarian']:
-                del self.role_dictionary[player].acting_upon[0]
             # Have Mark remove speak_with_dead players from the dead forum
             if self.role_dictionary[player].speak_with_dead and self.role_dictionary[player].alive:
                 self.mark_pm.write_message(f"Can you remove {self.role_dictionary[player].screenname} please?")
@@ -1696,6 +1704,9 @@ Winning Conditions:
 
     def run_day_checks(self):
         self.rebuild_dict()
+        for player in self.role_dictionary:
+            if self.role_dictionary[player].is_last_evil and not self.role_dictionary[player].resigned:
+                self.role_dictionary[player].immediate_action('', 'resign', [], self.role_dictionary[player].chat)
         pieces = self.day_thread.thread_pieces()
         chat = [self.day_thread for _ in range(len(pieces[0]))]
         pieces.append(chat)
@@ -1769,12 +1780,12 @@ Winning Conditions:
             if player.alive and not player.concussed and len(player.corrupted_by) == 0:
                 outcome = player.immediate_action(posts[i], actions[i].lower(), victims[i], objs[i])
                 if len(outcome) == 1:
-                    if (outcome[0] == 'Illusionist'
+                    if (outcome[0] == 'illusionist'
                             and datetime.datetime.now() < self.day_close_tm - datetime.timedelta(hours=2)):
                         text = ''
                         player.acting_upon = []
                         for pot_dead in self.role_dictionary:
-                            if self.role_dictionary[pot_dead].disguised:
+                            if len(self.role_dictionary[pot_dead].disguised_by) > 0:
                                 self.secondary_text = ''
                                 text = text + self.kill_player("illusionist", player,
                                                                self.role_dictionary[pot_dead])
@@ -1825,6 +1836,9 @@ Winning Conditions:
 
     def run_night_checks(self):
         self.rebuild_dict()
+        for player in self.role_dictionary:
+            if self.role_dictionary[player].is_last_evil and not self.role_dictionary[player].resigned:
+                self.role_dictionary[player].immediate_action('', 'resign', [], self.role_dictionary[player].chat)
         if self.cultleader.gamenum > 0:
             cult = []
             [post_ids, posters, posts, reacts, _] = self.cult_chat.convo_pieces()
@@ -2019,14 +2033,19 @@ Winning Conditions:
             if actions[i].lower() == 'unskipped':
                 chats[i].write_message(chats[i].quote_message(postids[i]) + f"There are {len(self.to_skip)} "
                                                                             f"people who have yet to skip.")
-            if len(self.to_skip) == 0:
-                self.night_close_tm = datetime.datetime.now()
+        if len(self.to_skip) == 0:
+            self.night_close_tm = datetime.datetime.now()
         self.output_data()
 
     def kill_player(self, method, killer, victim):
         actual_method = method
         if self.first_death.screenname == '':
             self.first_death = victim
+            if self.dead_speaker.gamenum == 0:
+                self.dead_speaker = self.first_death
+                self.first_death.chat("You are the first to die, and there is no role that can speak with the dead. "
+                                      "Therefore, you have the honor of creating the dead thread "
+                                      "with whatever theme you like.")
         # If victim is jellied, no kill
         if victim.alive is False:
             return ''
@@ -2064,6 +2083,7 @@ Winning Conditions:
         if victim in self.to_skip:
             del self.to_skip[self.to_skip.index(victim)]
         self.death = True
+        victim.night_killed = self.night
         victim.doused_by = []
         victim.disguised_by = []
         victim.concussed = False
@@ -2375,6 +2395,9 @@ Winning Conditions:
             return (f"[b]{victim.screenname}[/b] was killed by the Witch. "
                     f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n\n" + self.secondary_text)
         elif method == 'wolf':
+            for player in self.role_dictionary:
+                if self.role_dictionary[player].wolf_voting_power > 0:
+                    self.role_dictionary[player].has_killed = True
             self.output_data()
             return (f"[b]{victim.screenname}[/b] was killed by the werewolves. "
                     f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n\n" + self.secondary_text)
@@ -2383,6 +2406,9 @@ Winning Conditions:
             return (f"[b]{victim.screenname}[/b] was caught up in the werewolf berserk frenzy. "
                     f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n\n" + self.secondary_text)
         elif method == 'toxic':
+            for player in self.role_dictionary:
+                if self.role_dictionary[player].wolf_voting_power > 0:
+                    self.role_dictionary[player].has_killed = True
             self.output_data()
             return (f"[b]{victim.screenname}[/b] was killed after being poisoned by the werewolves. "
                     f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n\n" + self.secondary_text)

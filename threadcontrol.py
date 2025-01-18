@@ -6,13 +6,20 @@ from subprocess import CREATE_NO_WINDOW
 import time
 import requests
 import json
+import tenacity
 
 f = open(r"Z:\API.txt")
 API_KEY = f.read()
 f.close()
 
+_RETRY_ARGS = {
+     'wait': tenacity.wait.wait_random_exponential(multiplier=1.0, exp_base=2),
+     'stop': tenacity.stop.stop_after_attempt(10)
+}
+
 
 # queries the API to get the current membername for an ID. Useful because names change, IDs don't
+@tenacity.retry(**_RETRY_ARGS)
 def get_membername(memberid):
     api_url = f"https://gwforums.com/api/users/{memberid}"
     headers = {
@@ -20,6 +27,7 @@ def get_membername(memberid):
         "Content-Type": "application/x-www-form-urlencoded"
         }
     response = requests.get(api_url, headers=headers)
+    response.raise_for_status()
     return json.loads(response.text)['user']['username']
 
 
@@ -91,6 +99,7 @@ class Chat:
         }
         self.conv_id = conv_id
 
+    @tenacity.retry(**_RETRY_ARGS)
     def create_conversation(self, title, body, memberlist):
         api_url = "https://gwforums.com/api/conversations/"
         payload = {
@@ -101,6 +110,7 @@ class Chat:
         response = requests.post(api_url, headers=self.headers, data=payload)
         self.conv_id = json.loads(response.text)['conversation']['conversation_id']
 
+    @tenacity.retry(**_RETRY_ARGS)
     def quote_message(self, messageid):
         api_url = f"https://gwforums.com/api/conversation-messages/{messageid}"
         response = requests.get(api_url, headers=self.headers)
@@ -109,6 +119,7 @@ class Chat:
         user_id = json.loads(response.text)['message']['User']['user_id']
         return f'[QUOTE={username}, convMessage: {messageid}, member: {user_id}]' + parse_quote(message) + "[/QUOTE]"
 
+    @tenacity.retry(**_RETRY_ARGS)
     def write_message(self, body):
         api_url = "https://gwforums.com/api/conversation-messages/"
         payload = {
@@ -117,6 +128,7 @@ class Chat:
         }
         requests.post(api_url, headers=self.headers, data=payload)
 
+    @tenacity.retry(**_RETRY_ARGS)
     def convo_pieces(self):
         api_url = f"https://gwforums.com/api/conversations/{self.conv_id}/messages"
         response = requests.get(api_url, headers=self.headers)
@@ -133,6 +145,7 @@ class Chat:
                 items[4].append(post['message_date'])  # when posted
         return items
 
+    @tenacity.retry(**_RETRY_ARGS)
     def seen_message(self, messageid):
         api_url = f"https://gwforums.com/api/conversation-messages/{messageid}/react"
         payload = {
@@ -140,6 +153,7 @@ class Chat:
         }
         requests.post(api_url, headers=self.headers, data=payload)
 
+    @tenacity.retry(**_RETRY_ARGS)
     def close_chat(self):
         api_url = f"https://gwforums.com/api/conversations/{self.conv_id}"
         payload = {
@@ -147,6 +161,7 @@ class Chat:
         }
         requests.post(api_url, headers=self.headers, data=payload)
 
+    @tenacity.retry(**_RETRY_ARGS)
     def open_chat(self):
         api_url = f"https://gwforums.com/api/conversations/{self.conv_id}"
         payload = {
@@ -172,6 +187,7 @@ class Thread:
             response = requests.get(f"https://gwforums.com/api/threads/{thread_id}", headers=self.headers)
             self.open = json.loads(response.text)['thread']['discussion_open']
 
+    @tenacity.retry(**_RETRY_ARGS)
     def create_thread(self, title, body):
         api_url = "https://gwforums.com/api/threads/"
         payload = {
@@ -197,6 +213,7 @@ class Thread:
 #     "poll[close_units]":"hours",
 # }
 
+    @tenacity.retry(**_RETRY_ARGS)
     def lock_thread(self):
         api_url = f"https://gwforums.com/api/threads/{self.thread_id}"
         payload = {
@@ -205,11 +222,13 @@ class Thread:
         self.open = False
         requests.post(api_url, headers=self.headers, data=payload)
 
+    @tenacity.retry(**_RETRY_ARGS)
     def is_open(self):
         api_url = f"https://gwforums.com/api/threads/{self.thread_id}"
         response = requests.get(api_url, headers=self.headers)
         return json.loads(response.text)['thread']['discussion_open']
 
+    @tenacity.retry(**_RETRY_ARGS)
     def unlock_thread(self):
         api_url = f"https://gwforums.com/api/threads/{self.thread_id}"
         payload = {
@@ -218,6 +237,7 @@ class Thread:
         self.open = True
         requests.post(api_url, headers=self.headers, data=payload)
 
+    @tenacity.retry(**_RETRY_ARGS)
     def stick_thread(self):
         api_url = f"https://gwforums.com/api/threads/{self.thread_id}"
         payload = {
@@ -225,6 +245,7 @@ class Thread:
         }
         requests.post(api_url, headers=self.headers, data=payload)
 
+    @tenacity.retry(**_RETRY_ARGS)
     def unstick_thread(self):
         api_url = f"https://gwforums.com/api/threads/{self.thread_id}"
         payload = {
@@ -232,6 +253,7 @@ class Thread:
         }
         requests.post(api_url, headers=self.headers, data=payload)
 
+    @tenacity.retry(**_RETRY_ARGS)
     def move_thread(self, destinationid):
         api_url = f"https://gwforums.com/api/threads/{self.thread_id}/move"
         payload = {
@@ -243,6 +265,7 @@ class Thread:
         self.unstick_thread()
         self.move_thread(self.trash)
 
+    @tenacity.retry(**_RETRY_ARGS)
     def write_message(self, body):
         # [QUOTE="dimmerwit, post: 197510, member: 306"]
         api_url = "https://gwforums.com/api/posts/"
@@ -254,6 +277,7 @@ class Thread:
         post_id = json.loads(response.text)['post']['post_id']
         return post_id
 
+    @tenacity.retry(**_RETRY_ARGS)
     def thread_pieces(self):
         api_url = f"https://gwforums.com/api/threads/{self.thread_id}/posts"
         response = requests.get(api_url, headers=self.headers)
@@ -270,6 +294,7 @@ class Thread:
                 items[4].append(post['post_date'])  # when posted
         return items
 
+    @tenacity.retry(**_RETRY_ARGS)
     def seen_post(self, postid):
         api_url = f"https://gwforums.com/api/posts/{postid}/react"
         payload = {
@@ -278,6 +303,7 @@ class Thread:
         requests.post(api_url, headers=self.headers, data=payload)
 
     # uses list of names
+    @tenacity.retry(**_RETRY_ARGS)
     def create_poll(self, memberlist):
         api_url = f"https://gwforums.com/api/threads/{self.thread_id}/change-type"
         memberlist = sorted(memberlist, key=lambda v: v.upper())
@@ -297,24 +323,7 @@ class Thread:
             }
         requests.post(api_url, headers=self.headers, data=payload)
 
-    def check_poll_closed(self):
-        api_url = f"https://gwforums.com/api/threads/{self.thread_id}"
-        response = requests.get(api_url, headers=self.headers)
-        poll = json.loads(response.text)['thread']['Poll']
-        return time.time() > poll['close_date']
-
-    def get_poll_results(self):
-        api_url = f"https://gwforums.com/api/threads/{self.thread_id}"
-        response = requests.get(api_url, headers=self.headers)
-        votes = json.loads(response.text)['thread']['Poll']['responses']
-        names = []
-        vote_count = []
-        for i in votes:
-            names.append(votes[i]['text'])
-            vote_count.append(votes[i]['vote_count'])
-        final_structure = {'Name': names, 'Vote Count': vote_count}
-        return final_structure
-
+    @tenacity.retry(**_RETRY_ARGS)
     def delete_poll(self):
         api_url = f"https://gwforums.com/api/threads/{self.thread_id}/change-type"
         payload = {
@@ -322,6 +331,7 @@ class Thread:
             }
         requests.post(api_url, headers=self.headers, data=payload)
 
+    @tenacity.retry(**_RETRY_ARGS)
     def edit_post(self, postid, body):
         api_url = f"https://gwforums.com/api/posts/{postid}"
         payload = {
@@ -329,6 +339,7 @@ class Thread:
             }
         requests.post(api_url, headers=self.headers, data=payload)
 
+    @tenacity.retry(**_RETRY_ARGS)
     def post_shadow(self):
         api_url = f'https://gwforums.com/api/threads/f{self.thread_id}/posts'
         response = requests.post(api_url, headers=self.headers)
@@ -338,6 +349,8 @@ class Thread:
         self.edit_post(postid, newmessage+message)
 
         # [QUOTE="Zell 17, post: 197915, member: 45"] [/QUOTE]
+
+    @tenacity.retry(**_RETRY_ARGS)
     def quote_message(self, postid):
         api_url = f"https://gwforums.com/api/posts/{postid}"
         response = requests.get(api_url, headers=self.headers)
@@ -347,6 +360,7 @@ class Thread:
         return f'[QUOTE={username}, post: {postid}, member: {user_id}]' + parse_quote(message) + "[/QUOTE]"
 
     # uses player name, OLD name if changing. Need to keep track!
+    @tenacity.retry(**_RETRY_ARGS)
     def change_poll_item(self, member, newname):
         api_url = f"https://gwforums.com/api/threads/{self.thread_id}"
         response = requests.get(api_url, headers=self.headers)
@@ -372,11 +386,13 @@ class Thread:
         passwd = g.read()
         g.close()
         driver.find_element(By.NAME, "password").send_keys(passwd)
+        time.sleep(1)
         driver.find_element(By.XPATH, r'/html/body/div[5]/div/div[2]/div/form/div[1]/dl/dd/div/div[2]/button').click()
         time.sleep(1)
         driver.find_element(By.XPATH, r'/html/body/div[2]/ul/li/div/a').click()
         time.sleep(1)
         driver.find_element(By.XPATH, r'/html/body/div[2]/ul/li/div/div/div/div[2]/ul/li[3]/a').click()
+        time.sleep(1)
         driver.get(f"https://gwforums.com/threads/{self.thread_id}/poll/edit")
         memberid = xref[member]
         element = driver.find_element(By.NAME, f"poll[existing_responses][{memberid}]")
@@ -385,6 +401,7 @@ class Thread:
         element = driver.find_element(By.NAME, f'poll[question]')  # update title
         element.clear()
         element.send_keys(f"Who should the villagers lynch? ({lynch_threshold} votes required)")  # update title
+        time.sleep(1)
         xpath = r'/html/body/div[1]/div[5]/div/div[2]/div[2]/div/form[1]/div/dl/dd/div/div[2]/button/span'
         driver.find_element(By.XPATH, xpath).click()  # submit updates
         # payload = {
@@ -395,6 +412,7 @@ class Thread:
         # }
         # response = requests.post(api_url, headers=self.headers, data=payload)
 
+    @tenacity.retry(**_RETRY_ARGS)
     def get_raw_poll(self):
         api_url = f"https://gwforums.com/api/threads/{self.thread_id}"
         response = requests.get(api_url, headers=self.headers)
