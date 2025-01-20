@@ -52,3 +52,4 @@ while not wolf.game_over:
             time.sleep(300)
     wolf.run_day_checks()
     wolf.end_day()
+

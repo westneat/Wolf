@@ -129,7 +129,6 @@ class Player:
         self.last_thread_id = 0
         self.chat = tc.Chat()
         self.current_thread = tc.Thread()
-        self.voting_power = 1
         self.is_killer = False
         self.reviving = False
         self.noun = ''
@@ -243,8 +242,7 @@ class Player:
 
     def get_shadow_vote(self, keyword, voted, chat_obj):
         if (keyword == 'vote' and len(voted) == 1 and voted[0].alive and self.current_thread.open
-                and isinstance(chat_obj, tc.Chat) and len(self.corrupted_by) == 0 and len(self.muted_by) == 0
-                and not self.concussed):
+                and isinstance(chat_obj, tc.Chat) and len(self.corrupted_by) == 0):
             return [voted[0]]
         return []
 
@@ -2628,7 +2626,6 @@ class Sorcerer(Player):
         self.apparent_aura = 'Good'
         self.conjuror_can_take = False
         self.screenname = screenname
-        self.is_killer = True
         self.gamenum = gamenum
         self.noun = noun
         self.hhtargetable = False
@@ -3165,7 +3162,7 @@ class EvilDetective(Player):
                 chat_obj.write_message(chat_obj.quote_message(messageid) +
                                        f"{victims[0].screenname} and "
                                        f"{victims[1].screenname} are on [b]different teams[/b].")
-                return ['detective', self, [victims[0], victims[1]]]
+                return ['detective', self, victims]
             else:
                 chat_obj.write_message(chat_obj.quote_message(messageid) +
                                        f"{victims[0].screenname} and "
@@ -3206,8 +3203,9 @@ class Illusionist(Player):
     def immediate_action(self, messageid, keyword, victims, chat_obj):
         if keyword == 'kill' and self.current_thread.open and isinstance(chat_obj, tc.Chat):
             return ['illusionist']
-        if (keyword == 'disguise' and len(victims) == 1 and self.gamenum != victims[0].gamenum
-                and not self.current_thread.open and isinstance(chat_obj, tc.Chat)):
+        if (keyword == 'disguise' and len(victims) == 1 and self.gamenum != victims[0].gamenum and victims[0].alive
+                and self not in victims[0].disguised_by and not self.current_thread.open
+                and isinstance(chat_obj, tc.Chat)):
             if not self.jailed:
                 chat_obj.write_message(chat_obj.quote_message(messageid) +
                                        f"You are disguising "
@@ -3220,8 +3218,9 @@ class Illusionist(Player):
         return []
 
     def phased_action(self, messageid, keyword, victims, chat_obj):
-        if (keyword == 'disguise' and len(victims) == 1 and self.gamenum != victims[0].gamenum
-                and not self.current_thread.open and isinstance(chat_obj, tc.Chat)):
+        if (keyword == 'disguise' and len(victims) == 1 and self.gamenum != victims[0].gamenum and victims[0].alive
+                and self not in victims[0].disguised_by and not self.current_thread.open
+                and isinstance(chat_obj, tc.Chat)):
             chat_obj.write_message(chat_obj.quote_message(messageid) +
                                    f"You have disguised {victims[0].screenname}.")
             victims[0].disguised_by.append(self)
