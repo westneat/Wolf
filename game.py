@@ -131,6 +131,15 @@ class Game:
         self.rsv = 0
         self.secondary_text = ''  # Used for when there are multiple kills at once
         self.dead_speaker = role.Player()
+        self.first_post = 0
+        self.actions = '[table][tr][th]Phase[/th][th]Player[/th][th]Cause of Death[/th][th]Role[/th][/tr][/table]'
+
+    def add_action(self, player, method, revealed_role):
+        self.actions = self.actions[:self.actions.find("[/table]")]
+        phase = "Day " if self.day_thread.open else "Night "
+        num = self.night if phase == "Night " else self.night - 1
+        self.actions = self.actions + (f"[tr][td]{phase}{num}[/td][td]{player.screenname}[/td]"
+                                       f"[td]{method}[/td][td]{revealed_role}[/td][/tr][/table]")
 
     # Used once, at the end of night 1 to make a pretty table with all nouns -> names
     def print_nouns(self):
@@ -364,10 +373,12 @@ class Game:
     def day_post(self):
         post_list = sorted(self.player_names, key=lambda v: v.upper())
         tag_list = ''
+        all_alive = True
         for i in post_list:
             if self.role_dictionary[self.name_to_gamenum(i)].alive:
                 tag_list = tag_list + '@' + i + '\n'
             else:
+                all_alive = False
                 tag_list = tag_list + '[s]@' + i + '[/s]' + '\n'
         text = (f'''The day will start at [TIME=datetime]{self.night_close_tm.strftime('%Y-%m-%dT%H:%M:%S-0500')}[/TIME]
         
@@ -493,7 +504,8 @@ Winning Conditions:
                 f"{'[s]' if self.rv == 0 else ''}Wildcard Role: Satisfy your winning condition. "
                 f"Your winning condition trumps any other that may occur at the same time. "
                 f"(For example, if you lynch the fool and it creates a situation where there are 3 wolves left "
-                f"and 3 villagers, the Fool wins only).{'[/s]' if self.rv == 0 else ''}")
+                f"and 3 villagers, the Fool wins only).{'[/s]' if self.rv == 0 else ''}\n" +
+                self.actions if not all_alive else '')
         return text
 
     # can be chat or thread pieces passed in
@@ -985,6 +997,8 @@ Winning Conditions:
                 if len(outcome) == 3:
                     self.secondary_text = ''
                     self.new_thread_text = self.new_thread_text + self.kill_player(outcome[0], outcome[1], outcome[2])
+                if len(outcome) == 2 and outcome[0] == 'vote':
+                    self.manual_votes = outcome[1]
             elif posters[i].jailed:
                 posters[i].chat.write_message("You are still jailed and cannot act.")
             elif posters[i].concussed:
@@ -1132,7 +1146,7 @@ Winning Conditions:
             Could you please reset the dead forum for another game?''', [admin_id])
             # Set up Wolf Chat
             self.create_wolf_chat()
-            self.day_thread.create_thread(f"{self.game_title} Day {self.night}", self.day_post())
+            self.first_post = self.day_thread.create_thread(f"{self.game_title} Day {self.night}", self.day_post())
             self.day_thread.lock_thread()
             self.day_thread.stick_thread()
 
@@ -1212,6 +1226,8 @@ Winning Conditions:
                 player.acting_upon = []
             if player.role == 'Serial Killer':
                 player.mp += 100
+            if player.role in ['Bodyguard', 'Tough Guy']:
+                player.protected_by[player.role] = [player]
             player.jellied_by = []
             player.bell_ringer_watched_by = []
             player.skipped = False
@@ -1526,26 +1542,28 @@ Winning Conditions:
             # If we have additional votes, add them in before the final tally
             if len(self.manual_votes) > 0:
                 for additional_vote in self.manual_votes:
-                    voted_ind = poll_results['Name'].index(additional_vote.screenname)
-                    poll_results['Vote Count'][voted_ind] += 1
+                    if additional_vote.screenname in poll_results['Name']:
+                        voted_ind = poll_results['Name'].index(additional_vote.screenname)
+                        poll_results['Vote Count'][voted_ind] += 1
+                    else:
+                        poll_results['Name'].append(additional_vote.screenname)
+                        poll_results['Vote Count'].append(1)
 
         # Shadow in effect
         else:
             votes = []
             for i in self.role_dictionary:
                 player = self.role_dictionary[i]
-                if (player.alive and not player.concussed and
-                        len(player.corrupted_by) == 0 and
-                        len(player.muted_by[self.night-1]) == 0):
+                if player.alive:
                     pieces = player.chat.convo_pieces()
                     chat = [player.chat for _ in range(len(pieces[0]))]
                     pieces.append(chat)
-                    [_, _, actions, victims, _, _] = self.get_keyword_phrases(pieces)
+                    [postids, _, actions, victims, _, chats] = self.get_keyword_phrases(pieces)
                     for j in range(len(actions)):
                         if actions[j].lower() == "vote":
-                            outcome = player.get_shadow_vote('vote', victims)
+                            outcome = player.get_shadow_vote(postids[j], 'vote', victims[j], chats[j], True)
                         else:
-                            continue
+                            outcome = []
                         votes.extend(outcome)
             votecount = []
             names = []
@@ -1618,6 +1636,27 @@ Winning Conditions:
 
     def run_day_checks(self):
         self.rebuild_dict()
+        if datetime.datetime.now() > self.alch_deaths_tm:
+            text = ''
+            self.alch_deaths_tm = self.alch_deaths_tm + datetime.timedelta(days=100)  # trigger once
+            for i in self.role_dictionary:
+                player = self.role_dictionary[i]
+                if player.black_potion:
+                    text = text + self.kill_player('alchemist', role.Player(), player)
+                if player.red_potion > 1:
+                    text = text + self.kill_player('alchemist', role.Player(), player)
+            self.day_thread.write_message(text)
+        if self.shadow_in_effect:
+            for i in self.role_dictionary:
+                player = self.role_dictionary[i]
+                if player.alive:
+                    pieces = player.chat.convo_pieces()
+                    chat = [player.chat for _ in range(len(pieces[0]))]
+                    pieces.append(chat)
+                    [postids, _, actions, victims, _, chats] = self.get_keyword_phrases(pieces, new=True)
+                    for j in range(len(actions)):
+                        if actions[j].lower() == "vote":
+                            player.get_shadow_vote(postids[j], 'vote', victims[j], chats[j])
         for i in self.role_dictionary:
             player = self.role_dictionary[i]
             if player.is_last_evil and not player.resigned:
@@ -1694,42 +1733,41 @@ Winning Conditions:
                     post_skips_private = True
                     skip_private.append(posts[i])
                     skip_chats.append(objs[i])
-            if player.alive and not player.concussed and len(player.corrupted_by) == 0:
-                outcome = player.immediate_action(posts[i], actions[i].lower(), victims[i], objs[i])
-                if len(outcome) == 1:
-                    if (outcome[0] == 'illusionist'
-                            and datetime.datetime.now() < self.day_close_tm - datetime.timedelta(hours=2)):
-                        text = ''
-                        player.acting_upon = []
-                        for pot_dead in self.role_dictionary:
-                            if len(self.role_dictionary[pot_dead].disguised_by) > 0:
-                                self.secondary_text = ''
-                                text = text + self.kill_player("illusionist", player,
-                                                               self.role_dictionary[pot_dead])
-                        self.day_thread.write_message(text)
-                elif len(outcome) == 2:
-                    if outcome[0] == 'reveal':
-                        self.wolf_chat.write_message(f"The Sorcerer has revealed that [b]{outcome[1].screenname}"
-                                                     f"[/b] is the [b]{outcome[1].role}[/b].")
-                elif len(outcome) == 3:
-                    if isinstance(objs[i], tc.Thread):
-                        self.secondary_text = ''
-                        self.day_thread.write_message(self.day_thread.quote_message(posts[i]) +
-                                                      self.kill_player(outcome[0], outcome[1], outcome[2]))
-                    else:
-                        self.secondary_text = ''
-                        self.day_thread.write_message(self.kill_player(outcome[0], outcome[1], outcome[2]))
-                outcome2 = player.shoot_forger_gun(actions[i].lower(), victims[i], self.day_thread)
-                if len(outcome2) == 3:
+            outcome = player.immediate_action(posts[i], actions[i].lower(), victims[i], objs[i])
+            if len(outcome) == 1:
+                if (outcome[0] == 'illusionist'
+                        and datetime.datetime.now() < self.day_close_tm - datetime.timedelta(hours=2)):
+                    text = ''
+                    player.acting_upon = []
+                    for pot_dead in self.role_dictionary:
+                        if len(self.role_dictionary[pot_dead].disguised_by) > 0:
+                            self.secondary_text = ''
+                            text = text + self.kill_player("illusionist", player,
+                                                           self.role_dictionary[pot_dead])
+                    self.day_thread.write_message(text)
+            elif len(outcome) == 2:
+                if outcome[0] == 'reveal':
+                    self.wolf_chat.write_message(f"The Sorcerer has revealed that [b]{outcome[1].screenname}"
+                                                 f"[/b] is the [b]{outcome[1].role}[/b].")
+            elif len(outcome) == 3:
+                if isinstance(objs[i], tc.Thread):
                     self.secondary_text = ''
                     self.day_thread.write_message(self.day_thread.quote_message(posts[i]) +
-                                                  self.kill_player(outcome2[0], outcome2[1], outcome2[2]))
-                if (len(outcome) == 1 and outcome[0] == 'shadow'
-                        and datetime.datetime.now() < self.day_close_tm - datetime.timedelta(hours=12)):
-                    self.shadow_in_effect = True
-                if player.role == 'Sorcerer' and player.resigned:
-                    self.role_swap(player, role.Werewolf())
-                self.win_conditions()
+                                                  self.kill_player(outcome[0], outcome[1], outcome[2]))
+                else:
+                    self.secondary_text = ''
+                    self.day_thread.write_message(self.kill_player(outcome[0], outcome[1], outcome[2]))
+            outcome2 = player.shoot_forger_gun(actions[i].lower(), victims[i], self.day_thread)
+            if len(outcome2) == 3:
+                self.secondary_text = ''
+                self.day_thread.write_message(self.day_thread.quote_message(posts[i]) +
+                                              self.kill_player(outcome2[0], outcome2[1], outcome2[2]))
+            if (len(outcome) == 1 and outcome[0] == 'shadow'
+                    and datetime.datetime.now() < self.day_close_tm - datetime.timedelta(hours=12)):
+                self.shadow_in_effect = True
+            if player.role == 'Sorcerer' and player.resigned:
+                self.role_swap(player, role.Werewolf())
+            self.win_conditions()
         for i, post in enumerate(pieces[0]):
             if pieces[3][i] is False:
                 self.day_thread.seen_post(post)
@@ -1826,6 +1864,7 @@ Winning Conditions:
                         for action in actions:
                             if action == 'kill' and self.jailed[i].given_warden_weapon:
                                 survivor = role.Player()
+                                self.jailer.mp = 0
                                 if self.jailed[i].role == 'Werewolf Fan':
                                     self.secondary_text = ''
                                     self.new_thread_text = (self.new_thread_text +
@@ -1895,16 +1934,15 @@ Winning Conditions:
         for i in range(len(postids)):
             if posters[i].alive:
                 posters[i].skip_check(actions[i].lower(), postids[i], chats[i])
-            if posters[i].alive and not posters[i].concussed and not posters[i].nightmared:
-                if posters[i].role == 'Violinist':
-                    victims[i].append(self.first_death)
-                outcome = posters[i].immediate_action(postids[i], actions[i].lower(), victims[i], chats[i])
-                if len(outcome) == 3:
-                    self.secondary_text = ''
-                    self.new_thread_text = (self.new_thread_text +
-                                            self.day_thread.write_message(self.kill_player(outcome[0],
-                                                                                           outcome[1],
-                                                                                           outcome[2])))
+            if posters[i].role == 'Violinist':
+                victims[i].append(self.first_death)
+            outcome = posters[i].immediate_action(postids[i], actions[i].lower(), victims[i], chats[i])
+            if len(outcome) == 3:
+                self.secondary_text = ''
+                self.new_thread_text = (self.new_thread_text +
+                                        self.day_thread.write_message(self.kill_player(outcome[0],
+                                                                                       outcome[1],
+                                                                                       outcome[2])))
             if posters[i].role == 'Sorcerer' and posters[i].resigned:
                 self.role_swap(posters[i], role.Werewolf())
             if posters[i].skipped and posters[i] in self.to_skip:
@@ -2221,6 +2259,9 @@ Winning Conditions:
             self.rk -= 1
         elif victim.apparent_role in self.wolves:
             self.rww -= 1
+        ind = role.kill_methods()['keyword'].index(method)
+        self.add_action(victim, role.kill_methods()["Cause of Death"][ind], victim.apparent_role)
+        self.day_thread.edit_post(self.first_post, self.day_post())  # Update first post
         # Go through and print messages for each death method
         if method == 'lynched':
             self.output_data()

@@ -198,6 +198,7 @@ class Thread:
         }
         response = requests.post(api_url, headers=self.headers, data=payload)
         self.thread_id = json.loads(response.text)['thread']['thread_id']
+        return json.loads(response.text)['thread']['first_post_id']
 
 #        payload = {
 #     "node_id": forumid,
