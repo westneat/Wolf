@@ -1284,19 +1284,23 @@ Winning Conditions:
         for i in self.role_dictionary:
             if self.role_dictionary[i].confusion:
                 self.confusion_in_effect = True
-        self.win_conditions()
+        if self.win_conditions():
+            return
         # PHASE 2 (Wolves break out of warden prison or warden weapon used, moved to nightly check
 
         # PHASE 3 No wolf checks, those are under immediate action in the night loop
         self.phased_actions(['Voodoo Wolf', 'Librarian', 'Medium', 'Ritualist'], chat_items)
-        self.win_conditions()
+        if self.win_conditions():
+            return
         # PHASE 4 All protectors lumped together, can sort when attacks performed
         self.phased_actions(['Flagger', 'Doctor', 'Bodyguard', 'Witch', 'Tough Guy',
                              'Defender', 'Jelly Wolf', 'Beast Hunter'], chat_items)
-        self.win_conditions()
+        if self.win_conditions():
+            return
         # PHASE 5 Illu and Infector attack
         self.solo_attack(['Infector', 'Illusionist'])
-        self.win_conditions()
+        if self.win_conditions():
+            return
         # Apply misdirection before seers go
         for i in self.role_dictionary:
             player = self.role_dictionary[i]
@@ -1311,22 +1315,27 @@ Winning Conditions:
         # PHASE 6 Seers - Except Spirit
         self.phased_actions(['Violinist', 'Detective', 'Aura Seer', 'Sheriff',
                              'Bell Ringer', 'Preacher'], chat_items)
-        self.win_conditions()
+        if self.win_conditions():
+            return
         # PHASE 7
         self.phased_actions(['Marksman'], chat_items)
-        self.win_conditions()
+        if self.win_conditions():
+            return
 
         # PHASE 8
         self.phased_actions(['Witch'], chat_items)
-        self.win_conditions()
+        if self.win_conditions():
+            return
 
         # PHASE 9
         self.phased_actions(['Jailer'], chat_items)
-        self.win_conditions()
+        if self.win_conditions():
+            return
 
         # Phase 10
         self.phased_actions(['Red Lady', 'Forger'], chat_items)
-        self.win_conditions()
+        if self.win_conditions():
+            return
 
         # Phase 11
         self.solo_attack(['Alchemist', 'Arsonist', 'Corruptor', 'Cult Leader', 'Evil Detective',
@@ -1373,7 +1382,8 @@ Winning Conditions:
             self.tie_count += 1
         else:
             self.tie_count = 0
-        self.win_conditions()
+        if self.win_conditions():
+            return
         self.output_data()
 
     def start_day(self):
@@ -1520,6 +1530,7 @@ Winning Conditions:
         self.new_thread_text = self.new_thread_text + (f"The day will end at [TIME=datetime]"
                                                        f"{self.day_close_tm.strftime('%Y-%m-%dT%H:%M:%S-0500')}[/TIME]")
         self.day_thread.write_message(self.new_thread_text)
+        self.new_thread_text = ''
         self.output_data()
         if self.night == 1:
             self.day_thread.write_message(self.print_nouns())
@@ -1608,7 +1619,8 @@ Winning Conditions:
                     else:
                         self.secondary_text = ''
                         text = text + self.kill_player("lynched", role.Player(), vote_winner)
-        self.win_conditions()
+        if self.win_conditions():
+            return
         for i in self.role_dictionary:
             player = self.role_dictionary[i]
             if len(player.infected_by) > 0:
@@ -1631,7 +1643,8 @@ Winning Conditions:
             self.tie_count += 1
         else:
             self.tie_count = 0
-        self.win_conditions()
+        if self.win_conditions():
+            return
         self.output_data()
 
     def run_day_checks(self):
@@ -1767,7 +1780,8 @@ Winning Conditions:
                 self.shadow_in_effect = True
             if player.role == 'Sorcerer' and player.resigned:
                 self.role_swap(player, role.Werewolf())
-            self.win_conditions()
+            if self.win_conditions():
+                return
         for i, post in enumerate(pieces[0]):
             if pieces[3][i] is False:
                 self.day_thread.seen_post(post)
@@ -2115,10 +2129,12 @@ Winning Conditions:
         if victim.hhtarget:
             if actual_method == 'lynched':
                 self.win_conditions('Headhunter')
+                return
             else:
                 victim.hhtarget = False
         if victim.role == 'Fool' and actual_method == 'lynched':
             self.win_conditions('Fool')
+            return
         # Now go through each role and clean up their role effects upon death
         if victim.role in ['Jailer', 'Warden']:
             for player in self.jailed:
@@ -2411,7 +2427,7 @@ Winning Conditions:
                     f'{victim.screenname} was the [b]{victim.apparent_role}[/b].\n\n' + self.secondary_text)
         elif method == 'evilvisit':
             self.output_data()
-            return (f"[b]{victim.screenname}[/b] killed visiting a killer. "
+            return (f"[b]{victim.screenname}[/b] died visiting a killer. "
                     f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n\n" + self.secondary_text)
         elif method == 'poorvisit':
             self.output_data()
@@ -2449,43 +2465,83 @@ Winning Conditions:
                     wolf_count += 1
 
         if trigger == 'Fool':
-            self.day_thread.write_message("[b]The game is over[/b]. The Fool has won!")
+            self.new_thread_text = self.new_thread_text + "\n\n[b]The game is over[/b]. The Fool has won!"
             self.game_over = True
+            self.day_thread.write_message(self.new_thread_text)
+            if not self.day_thread.open:
+                self.day_thread.unlock_thread()
+            return True
 
         elif trigger == 'Headhunter':
-            self.day_thread.write_message("[b]The game is over[/b]. The Headhunter has won!")
+            self.new_thread_text = self.new_thread_text + "\n\n[b]The game is over[/b]. The Headhunter has won!"
             self.game_over = True
+            self.day_thread.write_message(self.new_thread_text)
+            if not self.day_thread.open:
+                self.day_thread.unlock_thread()
+            return True
 
         elif self.tie_count >= 6:
-            self.day_thread.write_message("[b]The game is over[/b]. It's a tie!")
+            self.new_thread_text = self.new_thread_text + "\n\n[b]The game is over[/b]. It's a tie!"
+            self.game_over = True
+            self.day_thread.write_message(self.new_thread_text)
+            if not self.day_thread.open:
+                self.day_thread.unlock_thread()
+            return True
 
         elif couple_count == 2 and (player_count == 2 or (player_count == 3 and self.cupid.alive)):
-            self.day_thread.write_message("[b]The game is over[/b]. The Lovers have won!")
+            self.new_thread_text = self.new_thread_text + "\n\n[b]The game is over[/b]. The Lovers have won!"
             self.game_over = True
+            self.day_thread.write_message(self.new_thread_text)
+            if not self.day_thread.open:
+                self.day_thread.unlock_thread()
+            return True
 
         elif insti_count == 2 and (player_count == 2 or (player_count == 3 and self.instigator.alive)):
-            self.day_thread.write_message("[b]The game is over[/b]. The Instigator team has won!")
+            self.new_thread_text = self.new_thread_text + "\n\n[b]The game is over[/b]. The Instigator team has won!"
             self.game_over = True
+            self.day_thread.write_message(self.new_thread_text)
+            if not self.day_thread.open:
+                self.day_thread.unlock_thread()
+            return True
 
         elif solo_count == 1 and player_count == 1:
             for i in self.role_dictionary:
                 player = self.role_dictionary[i]
                 if player.role.alive:
-                    self.day_thread.write_message(f"[b]The game is over[/b]. "
-                                                  f"The {player.role} has won!")
+                    self.new_thread_text = self.new_thread_text + (f"\n\n[b]The game is over[/b]. "
+                                                                   f"The {player.role} has won!")
                     self.game_over = True
+                    self.day_thread.write_message(self.new_thread_text)
+                    if not self.day_thread.open:
+                        self.day_thread.unlock_thread()
+                    return True
 
         elif wolf_count >= player_count / 2 and solo_count == 0:
-            self.day_thread.write_message(f"[b]The game is over[/b]. The Wolves have won!")
+            self.new_thread_text = self.new_thread_text + f"\n\n[b]The game is over[/b]. The Wolves have won!"
             self.game_over = True
+            self.day_thread.write_message(self.new_thread_text)
+            if not self.day_thread.open:
+                self.day_thread.unlock_thread()
+            return True
 
         elif wolf_count == 0 and solo_count == 0:
-            self.day_thread.write_message(f"[b]The game is over[/b]. The Village has won!")
+            self.new_thread_text = self.new_thread_text + f"\n\n[b]The game is over[/b]. The Village has won!"
             self.game_over = True
+            self.day_thread.write_message(self.new_thread_text)
+            if not self.day_thread.open:
+                self.day_thread.unlock_thread()
+            return True
 
         elif player_count == 0:
-            self.day_thread.write_message(f"[b]The game is over[/b]. Everyone is dead. It's a tie!")
+            self.new_thread_text = self.new_thread_text + f"\n\n[b]The game is over[/b]. Everyone is dead. It's a tie!"
             self.game_over = True
+            self.day_thread.write_message(self.new_thread_text)
+            if not self.day_thread.open:
+                self.day_thread.unlock_thread()
+            return True
+
+        else:
+            return False
 
     def output_data(self):
         # These are the game attributes we want to save

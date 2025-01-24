@@ -15,6 +15,8 @@ wolf.resume("Wolfbot Beta Threes")
 
 while not wolf.game_over:
     wolf.start_night()
+    if wolf.game_over:
+        break
     new_thread = False
     while datetime.datetime.now() < wolf.night_close_tm:
         if wolf.game_over:
@@ -33,6 +35,8 @@ while not wolf.game_over:
             wolf.day_thread.lock_thread()
         elif wolf.night == 1:
             new_thread = True
+    if wolf.game_over:
+        break
     wolf.run_night_checks()
     if not new_thread:
         new_thread = True
@@ -40,7 +44,11 @@ while not wolf.game_over:
         wolf.day_thread.create_thread(f"{wolf.game_title} Day {wolf.night}", wolf.day_post())
         wolf.day_thread.stick_thread()
         wolf.day_thread.lock_thread()
+    if wolf.game_over:
+        break
     wolf.end_night()
+    if wolf.game_over:
+        break
     wolf.start_day()
     while datetime.datetime.now() < wolf.day_close_tm:
         if wolf.game_over:
@@ -50,6 +58,9 @@ while not wolf.game_over:
         print("Completed")
         if datetime.datetime.now() < wolf.day_close_tm - datetime.timedelta(minutes=5):
             time.sleep(300)
+    if wolf.game_over:
+        break
     wolf.run_day_checks()
+    if wolf.game_over:
+        break
     wolf.end_day()
-
