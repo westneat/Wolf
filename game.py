@@ -2261,7 +2261,7 @@ Winning Conditions:
                 self.create_wolf_chat()
             if len(wolves_left) == 1:
                 wolves_left[0].is_last_evil = True
-        if self.day_thread.open:
+        if self.day_thread.open and method not in ["lynched", "judge", "mistrial"]:
             # remove player from poll
             self.day_thread.change_poll_item(victim.screenname, '')
         self.admin_pm.write_message(f"Can you add {victim.screenname} please?")
