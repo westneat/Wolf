@@ -1039,11 +1039,12 @@ Winning Conditions:
                                                             actions[i].lower(),
                                                             victims[i],
                                                             solo_killer.chat)
-                        final_victims = self.protection_checks(solo_killer, outcome[2])
-                        for victim in final_victims:
-                            self.secondary_text = ''
-                            self.new_thread_text = (self.new_thread_text +
-                                                    self.kill_player(outcome[0], outcome[1], victim))
+                        if len(outcome) == 3:
+                            final_victims = self.protection_checks(solo_killer, outcome[2])
+                            for victim in final_victims:
+                                self.secondary_text = ''
+                                self.new_thread_text = (self.new_thread_text +
+                                                        self.kill_player(outcome[0], outcome[1], victim))
                     else:
                         outcome = solo_killer.phased_action(postids[i],
                                                             actions[i].lower(),
@@ -1974,9 +1975,9 @@ Winning Conditions:
             self.first_death = victim
             if self.dead_speaker.gamenum == 0:
                 self.dead_speaker = self.first_death
-                self.first_death.chat("You are the first to die, and there is no role that can speak "
-                                      "with the dead. Therefore, you have the honor of creating the dead thread "
-                                      "with whatever theme you like.")
+                self.first_death.chat.write_message("You are the first to die, and there is no role that can speak "
+                                                    "with the dead. Therefore, you have the honor of creating the "
+                                                    "dead thread with whatever theme you like.")
         # If victim is jellied, no kill
         if victim.alive is False:
             return ''
@@ -2557,13 +2558,14 @@ Winning Conditions:
         # output game attributes to a text file
         f = open(f"{output_dir + self.game_title}.txt", 'w')
         for attribute in self.__dict__:
-            f.write(attribute + ": " + export(self.__dict__[attribute]) + '\n')
+            if attribute != 'master_data':
+                f.write(attribute + ": " + export(self.__dict__[attribute]) + '\n')
         f.close()
         # output each player's attributes to individual text files
         attributes = []
         for i in self.role_dictionary:
             player = self.role_dictionary[i]
-            g = open(f"{output_dir + self.game_title} Player {player}.txt", 'w')
+            g = open(f"{output_dir + self.game_title} Player {i}.txt", 'w')
             temp = str(type(player))
             obj = temp[temp.find(".") + 1:temp.find("'>")]
             g.write(f"object: {obj}\n")

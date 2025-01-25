@@ -13,8 +13,11 @@ wolf = gm.Game([47, 157, 62, 101, 45, 65, 7, 40, 4, 8, 100, 82, 128, 67, 306, 18
 
 wolf.resume("Wolfbot Beta Threes")
 
+flag = True
 while not wolf.game_over:
-    wolf.start_night()
+    if not flag:
+        wolf.start_night()
+    flag = False
     if wolf.game_over:
         break
     new_thread = False
