@@ -375,7 +375,7 @@ class Thread:
             lynch_threshold = (len(xref)-1) // 2
         options = Options()
         options.add_argument("--log-level=3")
-        service = Service(r'F:\Python\chromedriver-win64\chromedriver.exe')
+        service = Service(r'F:\F\Python\chromedriver-win64\chromedriver.exe')
         service.creationflags = CREATE_NO_WINDOW
         driver = webdriver.Chrome(service=service, options=options)
         driver.implicitly_wait(100)
@@ -428,7 +428,7 @@ class Thread:
                 vote_receivers.append(votes[i]['text'])
         options = Options()
         options.add_argument("--log-level=3")
-        service = Service(r'F:\Python\chromedriver-win64\chromedriver.exe')
+        service = Service(r'F:\F\Python\chromedriver-win64\chromedriver.exe')
         service.creationflags = CREATE_NO_WINDOW
         driver = webdriver.Chrome(service=service, options=options)
         driver.implicitly_wait(100)

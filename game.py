@@ -1621,6 +1621,7 @@ Winning Conditions:
                         self.secondary_text = ''
                         text = text + self.kill_player("lynched", role.Player(), vote_winner)
         if self.win_conditions():
+            self.day_thread.write_message(text)
             return
         for i in self.role_dictionary:
             player = self.role_dictionary[i]
@@ -2508,7 +2509,7 @@ Winning Conditions:
         elif solo_count == 1 and player_count == 1:
             for i in self.role_dictionary:
                 player = self.role_dictionary[i]
-                if player.role.alive:
+                if player.alive:
                     self.new_thread_text = self.new_thread_text + (f"\n\n[b]The game is over[/b]. "
                                                                    f"The {player.role} has won!")
                     self.game_over = True

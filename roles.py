@@ -437,7 +437,7 @@ class Detective(Player):
         if keyword == 'check' and isinstance(chat_obj, tc.Chat):
             if (len(victims) == 2 and are_all_alive(victims) and victims[0].gamenum != self.gamenum
                     and victims[1].gamenum != self.gamenum and victims[0].gamenum != victims[1].gamenum
-                    and not self.current_thread.open and not not self.jailed and self.alive and
+                    and not self.current_thread.open and not self.jailed and self.alive and
                     len(self.corrupted_by) == 0 and not self.concussed and not self.nightmared):
                 chat_obj.write_message(chat_obj.quote_message(messageid) +
                                        f"You are checking "
@@ -451,7 +451,7 @@ class Detective(Player):
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You must check alive targets.")
             elif victims[0].gamenum == self.gamenum or victims[1].gamenum == self.gamenum:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You can't target yourself.")
-            elif not self.current_thread.open:
+            elif self.current_thread.open:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only act during the night.")
             elif not self.alive:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You are dead.")
@@ -472,7 +472,7 @@ class Detective(Player):
         # people are alive, and they aren't checking themselves
         if (keyword == 'check' and len(victims) == 2 and are_all_alive(victims) and victims[0].gamenum != self.gamenum
                 and victims[1].gamenum != self.gamenum and victims[0].gamenum != victims[1].gamenum
-                and not self.current_thread.open and not not self.jailed and self.alive and
+                and not self.current_thread.open and not self.jailed and self.alive and
                 len(self.corrupted_by) == 0 and not self.concussed and isinstance(chat_obj, tc.Chat)
                 and not self.nightmared):
             if victims[0].apparent_team == victims[1].apparent_team:
