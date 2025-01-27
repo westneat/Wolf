@@ -345,6 +345,7 @@ class Bully(Player):
                                                   "and will die if struck again. ")
                     victims[0].concussed = True
                     victims[0].has_been_concussed = True
+                    return ['success']
             elif len(victims) != 1:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only rock one person per day.")
             elif self.mp < 25:
@@ -399,6 +400,7 @@ class Conjuror(Player):
                 self.new_role = victims[0]
                 chat_obj.write_message(chat_obj.quote_message(messageid) +
                                        f"You have successfully taken {victims[0].screenname}'s role.")
+                return [victims[0].role]
             elif len(victims) != 1:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only take one role.")
             elif victims[0].alive:
@@ -475,14 +477,6 @@ class Detective(Player):
                 and not self.current_thread.open and not self.jailed and self.alive and
                 len(self.corrupted_by) == 0 and not self.concussed and isinstance(chat_obj, tc.Chat)
                 and not self.nightmared):
-            if victims[0].apparent_team == victims[1].apparent_team:
-                chat_obj.write_message(chat_obj.quote_message(messageid) +
-                                       f"{victims[0].screenname} and {victims[1].screenname} "
-                                       f"are on the [b]same team[/b].")
-            else:
-                chat_obj.write_message(chat_obj.quote_message(messageid) +
-                                       f"{victims[0].screenname} and {victims[1].screenname} "
-                                       f"are on [b]different teams[/b].")
             if len(victims[0].infected_by) > 0:
                 self.infected_by = victims[0].infected_by.copy()
                 self.chat.write_message(
@@ -491,6 +485,16 @@ class Detective(Player):
                 self.infected_by = victims[1].infected_by.copy()
                 self.chat.write_message(
                     f"You have been infected and will die at the end of the day if the Infector is not killed.")
+            if victims[0].apparent_team == victims[1].apparent_team:
+                chat_obj.write_message(chat_obj.quote_message(messageid) +
+                                       f"{victims[0].screenname} and {victims[1].screenname} "
+                                       f"are on the [b]same team[/b].")
+                return ['same']
+            else:
+                chat_obj.write_message(chat_obj.quote_message(messageid) +
+                                       f"{victims[0].screenname} and {victims[1].screenname} "
+                                       f"are on [b]different teams[/b].")
+                return ['different']
         return []
 
 
@@ -622,6 +626,7 @@ class Jailer(Player):
             victims[0].jailed = True
             victims[0].protected_by['Jailer'].append(self)
             chat_obj.write_message(chat_obj.quote_message(messageid) + f"{victims[0].screenname} has been jailed.")
+            return ['jailed']
         if (keyword == 'shoot' and len(victims) == 1 and self.mp == 100 and victims[0].alive and victims[0].jailed
                 and self.alive and victims[0].gamenum != self.gamenum and not self.current_thread.open
                 and not self.concussed and len(self.corrupted_by) == 0 and not self.nightmared
@@ -692,6 +697,7 @@ class Medium(Player):
                 and isinstance(chat_obj, tc.Chat)):
             self.mp = self.mp - 100
             victims[0].reviving = True
+            return ['revived']
         return []
 
 
@@ -724,6 +730,7 @@ class Ritualist(Player):
                                        f"{victims[0].screenname if self.night > 1 else victims[0].noun}"
                                        f" has the revival spell cast upon them.")
                 victims[0].spelled = True
+                return ['spelled']
             elif len(victims) != 1:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only spell one person.")
             elif self.mp < 100:
@@ -814,6 +821,7 @@ class Warden(Player):
                 Wolfbot kill
                 
                 Do it in the jail chat with the person you are killing.''')
+                return ['armed']
             elif len(victims) != 1:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only arm one person.")
             elif self.mp < 100:
@@ -850,6 +858,7 @@ class Warden(Player):
             chat_obj.write_message(chat_obj.quote_message(messageid) +
                                    f"{victims[0].screenname} and {victims[1].screenname} are in jail. "
                                    f"Their conversation will be relayed in a separate window.")
+            return ['jailed']
         return []
 
 
@@ -908,12 +917,13 @@ class AuraSeer(Player):
                 and isinstance(chat_obj, tc.Chat) and not self.jailed
                 and victims[0].gamenum != self.gamenum and not self.current_thread.open and self.alive
                 and not self.concussed and len(self.corrupted_by) == 0 and not self.nightmared):
-            chat_obj.write_message(chat_obj.quote_message(messageid) +
-                                   f"{victims[0].screenname} is [b]{victims[0].apparent_aura}[/b].")
             if len(victims[0].infected_by) > 0:
                 self.infected_by = victims[0].infected_by.copy()
                 self.chat.write_message(
                     f"You have been infected and will die at the end of the day if the Infector is not killed.")
+            chat_obj.write_message(chat_obj.quote_message(messageid) +
+                                   f"{victims[0].screenname} is [b]{victims[0].apparent_aura}[/b].")
+            return [victims[0].apparent_aura]
         return []
 
 
@@ -940,6 +950,7 @@ class Avenger(Player):
                                        f"You are currently avenging upon "
                                        f"{victims[0].screenname if self.night > 1 else victims[0].noun}.")
                 self.acting_upon = victims
+                return [victims[0].screenname]
             elif len(victims) != 1:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only avenge upon one person.")
             elif not victims[0].alive:

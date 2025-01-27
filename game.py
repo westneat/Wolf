@@ -133,6 +133,7 @@ class Game:
         self.dead_speaker = role.Player()
         self.first_post = 0
         self.actions = '[table][tr][th]Phase[/th][th]Player[/th][th]Cause of Death[/th][th]Role[/th][/tr][/table]'
+        self.log = {'Phase': [], 'Player': [], 'Action': [], 'Result': []}
 
     def add_action(self, player, method, revealed_role):
         self.actions = self.actions[:self.actions.find("[/table]")]
@@ -987,9 +988,7 @@ Winning Conditions:
             [chat_items[0], chat_items[1], chat_items[2], chat_items[3], chat_items[4], chat_items[5]]
         for i in range(len(postids)):
             if (posters[i].role in rolelist and not posters[i].jailed and
-                    (posters[i].alive or (posters[i].role in ['Librarian', 'Voodoo Wolf']
-                     and posters[i].night_killed == self.night))
-                    and not posters[i].concussed and not posters[i].nightmared and
+                    not posters[i].concussed and not posters[i].nightmared and
                     datetime.datetime.fromtimestamp(times[i]) > self.day_open_tm):
                 if posters[i].role == 'Violinist':
                     victims[i].append(self.first_death)
@@ -997,8 +996,32 @@ Winning Conditions:
                 if len(outcome) == 3:
                     self.secondary_text = ''
                     self.new_thread_text = self.new_thread_text + self.kill_player(outcome[0], outcome[1], outcome[2])
+                    phase = f"Day {self.night - 1}" if self.day_thread.open else f'Night {self.night}'
+                    self.log['Phase'].append(phase)
+                    self.log['Player'].append(posters[i].screenname)
+                    text = ''
+                    for k, victim in enumerate(victims[i]):
+                        if k == len(victims[i]) - 1:
+                            text = text + victim.screenname
+                        else:
+                            text = text + victim.screenname + ', '
+                    self.log['Action'].append(actions[i].lower() + " " + text)
+                    self.log['Result'].append("success")
                 if len(outcome) == 2 and outcome[0] == 'vote':
                     self.manual_votes = outcome[1]
+                    self.secondary_text = ''
+                    self.new_thread_text = self.new_thread_text + self.kill_player(outcome[0], outcome[1], outcome[2])
+                    phase = f"Day {self.night - 1}" if self.day_thread.open else f'Night {self.night}'
+                    self.log['Phase'].append(phase)
+                    self.log['Player'].append(posters[i].screenname)
+                    text = ''
+                    for k, victim in enumerate(victims[i]):
+                        if k == len(victims[i]) - 1:
+                            text = text + victim.screenname
+                        else:
+                            text = text + victim.screenname + ', '
+                    self.log['Action'].append(actions[i].lower() + " " + text)
+                    self.log['Result'].append("success")
             elif posters[i].jailed:
                 posters[i].chat.write_message("You are still jailed and cannot act.")
             elif posters[i].concussed:
@@ -1235,6 +1258,8 @@ Winning Conditions:
             player.current_thread = self.day_thread
             if player.alive:
                 self.to_skip.append(player)
+                if self.night != 1:
+                    player.chat.write_message(f"It is now Night {self.night}.")
             if self.night == 1:
                 player.chat.create_conversation(f"{self.game_title} Role",
                                                 player.initial_PM + '\n\n' +
@@ -1404,6 +1429,7 @@ Winning Conditions:
             player.action_used = False
             player.skipped = False
             if player.alive:
+                player.chat.write_message(f"It is now Day {self.night}.")
                 self.to_skip.append(player)
             if player.shadow:
                 self.shadow_available = True
@@ -1570,10 +1596,21 @@ Winning Conditions:
                     pieces = player.chat.convo_pieces()
                     chat = [player.chat for _ in range(len(pieces[0]))]
                     pieces.append(chat)
-                    [postids, _, actions, victims, _, chats] = self.get_keyword_phrases(pieces)
+                    [postids, posters, actions, victims, _, chats] = self.get_keyword_phrases(pieces)
                     for j in range(len(actions)):
                         if actions[j].lower() == "vote":
                             outcome = player.get_shadow_vote(postids[j], 'vote', victims[j], chats[j], True)
+                            phase = f"Day {self.night - 1}" if self.day_thread.open else f'Night {self.night}'
+                            self.log['Phase'].append(phase)
+                            self.log['Player'].append(posters[i].screenname)
+                            text = ''
+                            for k, victim in enumerate(victims[i]):
+                                if k == len(victims[i]) - 1:
+                                    text = text + victim.screenname
+                                else:
+                                    text = text + victim.screenname + ', '
+                            self.log['Action'].append(actions[i].lower() + " " + text)
+                            self.log['Result'].append("success")
                         else:
                             outcome = []
                         votes.extend(outcome)
@@ -1621,7 +1658,6 @@ Winning Conditions:
                         self.secondary_text = ''
                         text = text + self.kill_player("lynched", role.Player(), vote_winner)
         if self.win_conditions():
-            self.day_thread.write_message(text)
             return
         for i in self.role_dictionary:
             player = self.role_dictionary[i]
@@ -1676,6 +1712,10 @@ Winning Conditions:
             player = self.role_dictionary[i]
             if player.is_last_evil and not player.resigned:
                 player.immediate_action('', 'resign', [], player.chat)
+                self.log['Phase'].append(f"Day {self.night-1}")
+                self.log['Player'].append(player.screenname)
+                self.log['Action'].append(f"resign")
+                self.log['Result'].append(f"resigned")
         pieces = self.day_thread.thread_pieces()
         chat = [self.day_thread for _ in range(len(pieces[0]))]
         pieces.append(chat)
@@ -1752,18 +1792,50 @@ Winning Conditions:
             if len(outcome) == 1:
                 if (outcome[0] == 'illusionist'
                         and datetime.datetime.now() < self.day_close_tm - datetime.timedelta(hours=2)):
-                    text = ''
                     player.acting_upon = []
+                    text = ''
                     for pot_dead in self.role_dictionary:
                         if len(self.role_dictionary[pot_dead].disguised_by) > 0:
                             self.secondary_text = ''
                             text = text + self.kill_player("illusionist", player,
                                                            self.role_dictionary[pot_dead])
                     self.day_thread.write_message(text)
+                    self.log['Phase'].append(f"Day {self.night - 1}")
+                    self.log['Player'].append(player.screenname)
+                    self.log['Action'].append("kill all disguised")
+                    self.log['Result'].append("all disguised dead")
+                elif (outcome[0] == 'shadow' and datetime.datetime.now() < self.day_close_tm -
+                        datetime.timedelta(hours=12)):
+                    self.shadow_in_effect = True
+                    self.log['Phase'].append(f"Day {self.night - 1}")
+                    self.log['Player'].append(player.screenname)
+                    self.log['Action'].append("shadow")
+                    self.log['Result'].append("shadowed")
+                else:
+                    self.log['Phase'].append(f"Day {self.night - 1}")
+                    self.log['Player'].append(player.screenname)
+                    text = ''
+                    for k, victim in enumerate(victims[i]):
+                        if k == len(victims[i]) - 1:
+                            text = text + victim.screenname
+                        else:
+                            text = text + victim.screenname + ', '
+                    self.log['Action'].append(actions[i].lower() + " " + text)
+                    self.log['Result'].append(outcome[0])
             elif len(outcome) == 2:
                 if outcome[0] == 'reveal':
                     self.wolf_chat.write_message(f"The Sorcerer has revealed that [b]{outcome[1].screenname}"
                                                  f"[/b] is the [b]{outcome[1].role}[/b].")
+                    self.log['Phase'].append(f"Day {self.night - 1}")
+                    self.log['Player'].append(player.screenname)
+                    text = ''
+                    for k, victim in enumerate(victims[i]):
+                        if k == len(victims[i]) - 1:
+                            text = text + victim.screenname
+                        else:
+                            text = text + victim.screenname + ', '
+                    self.log['Action'].append(actions[i].lower() + " " + text)
+                    self.log['Result'].append("revealed")
             elif len(outcome) == 3:
                 if isinstance(objs[i], tc.Thread):
                     self.secondary_text = ''
@@ -1772,14 +1844,31 @@ Winning Conditions:
                 else:
                     self.secondary_text = ''
                     self.day_thread.write_message(self.kill_player(outcome[0], outcome[1], outcome[2]))
+                self.log['Phase'].append(f"Day {self.night - 1}")
+                self.log['Player'].append(player.screenname)
+                text = ''
+                for k, victim in enumerate(victims[i]):
+                    if k == len(victims[i]) - 1:
+                        text = text + victim.screenname
+                    else:
+                        text = text + victim.screenname + ', '
+                self.log['Action'].append(actions[i].lower() + " " + text)
+                self.log['Result'].append("success")
             outcome2 = player.shoot_forger_gun(actions[i].lower(), victims[i], self.day_thread)
             if len(outcome2) == 3:
                 self.secondary_text = ''
                 self.day_thread.write_message(self.day_thread.quote_message(posts[i]) +
                                               self.kill_player(outcome2[0], outcome2[1], outcome2[2]))
-            if (len(outcome) == 1 and outcome[0] == 'shadow'
-                    and datetime.datetime.now() < self.day_close_tm - datetime.timedelta(hours=12)):
-                self.shadow_in_effect = True
+                self.log['Phase'].append(f"Day {self.night - 1}")
+                self.log['Player'].append(player.screenname)
+                text = ''
+                for k, victim in enumerate(victims[i]):
+                    if k == len(victims[i]) - 1:
+                        text = text + victim.screenname
+                    else:
+                        text = text + victim.screenname + ', '
+                self.log['Action'].append(actions[i].lower() + " " + text)
+                self.log['Result'].append("success")
             if player.role == 'Sorcerer' and player.resigned:
                 self.role_swap(player, role.Werewolf())
             if self.win_conditions():
@@ -1812,6 +1901,10 @@ Winning Conditions:
             player = self.role_dictionary[i]
             if player.is_last_evil and not player.resigned:
                 player.immediate_action('', 'resign', [], player.chat)
+                self.log['Phase'].append(f"Night {self.night}")
+                self.log['Player'].append(player.screenname)
+                self.log['Action'].append(f"resign")
+                self.log['Result'].append(f"resigned")
         if self.cultleader.gamenum > 0:
             cult = []
             [post_ids, posters, posts, reacts, _] = self.cult_chat.convo_pieces()
