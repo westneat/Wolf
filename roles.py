@@ -400,7 +400,7 @@ class Conjuror(Player):
                 self.new_role = victims[0]
                 chat_obj.write_message(chat_obj.quote_message(messageid) +
                                        f"You have successfully taken {victims[0].screenname}'s role.")
-                return [victims[0].role]
+                return ['success']
             elif len(victims) != 1:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only take one role.")
             elif victims[0].alive:
@@ -626,7 +626,7 @@ class Jailer(Player):
             victims[0].jailed = True
             victims[0].protected_by['Jailer'].append(self)
             chat_obj.write_message(chat_obj.quote_message(messageid) + f"{victims[0].screenname} has been jailed.")
-            return ['jailed']
+            return ['success']
         if (keyword == 'shoot' and len(victims) == 1 and self.mp == 100 and victims[0].alive and victims[0].jailed
                 and self.alive and victims[0].gamenum != self.gamenum and not self.current_thread.open
                 and not self.concussed and len(self.corrupted_by) == 0 and not self.nightmared
@@ -697,7 +697,7 @@ class Medium(Player):
                 and isinstance(chat_obj, tc.Chat)):
             self.mp = self.mp - 100
             victims[0].reviving = True
-            return ['revived']
+            return ['success']
         return []
 
 
@@ -730,7 +730,7 @@ class Ritualist(Player):
                                        f"{victims[0].screenname if self.night > 1 else victims[0].noun}"
                                        f" has the revival spell cast upon them.")
                 victims[0].spelled = True
-                return ['spelled']
+                return ['success']
             elif len(victims) != 1:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only spell one person.")
             elif self.mp < 100:
@@ -821,7 +821,7 @@ class Warden(Player):
                 Wolfbot kill
                 
                 Do it in the jail chat with the person you are killing.''')
-                return ['armed']
+                return ['success']
             elif len(victims) != 1:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only arm one person.")
             elif self.mp < 100:
@@ -858,7 +858,7 @@ class Warden(Player):
             chat_obj.write_message(chat_obj.quote_message(messageid) +
                                    f"{victims[0].screenname} and {victims[1].screenname} are in jail. "
                                    f"Their conversation will be relayed in a separate window.")
-            return ['jailed']
+            return ['success']
         return []
 
 
@@ -950,7 +950,7 @@ class Avenger(Player):
                                        f"You are currently avenging upon "
                                        f"{victims[0].screenname if self.night > 1 else victims[0].noun}.")
                 self.acting_upon = victims
-                return [victims[0].screenname]
+                return ["success"]
             elif len(victims) != 1:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only avenge upon one person.")
             elif not victims[0].alive:
@@ -1027,6 +1027,7 @@ class BeastHunter(Player):
             self.trap_on = victims[0].gamenum
             self.cooldown = True
             victims[0].protected_by['Beast Hunter'].append(self)
+            return ["success"]
         return []
 
 
@@ -1088,6 +1089,7 @@ class BellRinger(Player):
             victims[0].bell_ringer_watched_by.append(self)
             victims[1].bell_ringer_watched_by.append(self)
             self.acting_upon = [victims[0], victims[1]]
+            return ["success"]
         return []
 
 
@@ -1141,6 +1143,7 @@ class Bodyguard(Player):
                 and not self.current_thread.open and not self.jailed and self.alive
                 and not self.concussed and len(self.corrupted_by) == 0 and not self.nightmared):
             victims[0].protected_by['Bodyguard'].append(self)
+            return ["success"]
         return []
 
 
@@ -1206,6 +1209,7 @@ class Defender(Player):
                     player.protected_by['Defender'].append(self)
                     text = text + f"\n{player.screenname}"
                     self.mp = self.mp - 16*len(victims)
+            return ["success"]
         return []
 
 
@@ -1262,6 +1266,7 @@ class Doctor(Player):
             victims[0].protected_by['Doctor'].append(self)
             chat_obj.write_message(chat_obj.quote_message(messageid) +
                                    f"You attempted to protect {victims[0].screenname} tonight.")
+            return ["success"]
         return []
 
 
@@ -1347,6 +1352,7 @@ class Flagger(Player):
             chat_obj.write_message(chat_obj.quote_message(messageid) +
                                    f"You attempted to redirect all evil attacks from "
                                    f"{victims[0].screenname} towards {victims[1].screenname}.")
+            return ["success"]
         return []
 
 
@@ -1378,6 +1384,7 @@ class FlowerChild(Player):
                         i.unlynchable_by.remove(self)
                 victims[0].unlynchable_by.append(self)
                 self.acting_upon = victims
+                return ["success"]
             elif len(victims) != 1:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only protect one person.")
             elif self.mp < 100:
@@ -1521,6 +1528,7 @@ class Forger(Player):
             self.forger_guns.append(self)
             chat_obj.write_message(chat_obj.quote_message(messageid) +
                                    "You have successfully finished forging a gun.")
+            return ["success"]
         if (keyword == 'shield' and isinstance(chat_obj, tc.Chat) and not self.action_used and
                 self.shields_forged <= 1 and not self.current_thread.open and not self.jailed and self.alive
                 and not self.concussed and len(self.corrupted_by) == 0 and not self.nightmared
@@ -1530,6 +1538,7 @@ class Forger(Player):
             self.forger_shields.append(self)
             chat_obj.write_message(chat_obj.quote_message(messageid) +
                                    "You have successfully finished forging a shield.")
+            return ["success"]
             # We have a gun, giftee is alive, one giftee, we haven't given them a gun before
         if (keyword == 'arm' and self in self.forger_guns and victims[0].alive and len(victims) == 1
                 and not self.jailed and victims[0].gamenum != self.gamenum and self.alive
@@ -1548,6 +1557,7 @@ class Forger(Player):
             victims[0].chat.write_message("You have been gifted a gun by the Forger. Use it by writing:\n\n"
                                           "Wolfbot shoot (username)\n\nanytime during the day. If you already have "
                                           "bullets, you will use this gun first.")
+            return ["success"]
             # We have a shield, giftee is alive, one giftee, we haven't given them a shield before
         if (keyword == 'arm' and self in self.forger_shields and victims[0].alive and len(victims) == 1
                 and not self.jailed and victims[0].gamenum != self.gamenum and self.alive
@@ -1566,6 +1576,7 @@ class Forger(Player):
             chat_obj.write_message(text)
             victims[0].chat.write_message("You have been gifted a shield by the Forger. "
                                           "Use is automatic and requires no action from you.")
+            return ["success"]
         return []
 
 
@@ -1685,6 +1696,7 @@ class Librarian(Player):
             victims[0].muted_by[self.night].append(self)
             text = chat_obj.quote_message(messageid) + f"{victims[0].screenname} has been muted."
             chat_obj.write_message(text)
+            return ["success"]
         return []
 
 
@@ -1711,6 +1723,7 @@ class Loudmouth(Player):
                         f"You will reveal {victims[0].screenname if self.night > 1 else victims[0].noun} upon death.")
                 chat_obj.write_message(text)
                 self.acting_upon = victims
+                return ["success"]
             elif len(victims) != 1:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only reveal one person.")
             elif not victims[0].alive:
@@ -1839,6 +1852,7 @@ class Marksman(Player):
             self.acting_upon = victims[0]
             text = chat_obj.quote_message(messageid) + f"{victims[0].screenname} is now marked."
             chat_obj.write_message(text)
+            return ["success"]
         return []
 
 
@@ -1918,6 +1932,7 @@ class Preacher(Player):
             self.acting_upon = victims
             victims[0].preacher_watched_by.append(self)
             chat_obj.write_message(chat_obj.quote_message(messageid) + f"You watched {victims[0].screenname} tonight.")
+            return ["success"]
         if (keyword == 'vote' and isinstance(chat_obj, tc.Chat) and are_all_alive(victims) and self.current_thread.open
                 and len(victims) <= self.votes and self.current_thread.open and len(self.corrupted_by) == 0
                 and self not in victims and not self.concussed and len(self.muted_by[self.night - 1]) == 0):
@@ -2059,6 +2074,7 @@ class RedLady(Player):
                                    f"You visited {victims[0].screenname} last night.")
             if victims[0].is_killer:
                 return ['evilvisit', victims[0], self]
+            return ["success"]
         return []
 
 
@@ -2119,6 +2135,7 @@ class Sheriff(Player):
                 self.infected_by = victims[0].infected_by.copy()
                 self.chat.write_message(
                     f"You have been infected and will die at the end of the day if the Infector is not killed.")
+            return ["success"]
         return []
 
 
@@ -2166,12 +2183,11 @@ class SpiritSeer(Player):
                                        f"{victims[0].screenname if self.night > 1 else victims[0].noun}"
                                        f" and {victims[1].screenname if self.night > 1 else victims[1].noun}"
                                        f" at the end of the night.")
-            if keyword == 'watch' and isinstance(chat_obj, tc.Chat):
-                if (len(victims) == 1 and victims[0].gamenum != self.gamenum and victims[0].alive
-                        and not self.current_thread.open and self.alive and not self.concussed
-                        and len(self.corrupted_by) == 0 and not self.nightmared and not self.jailed):
-                    chat_obj.write_message(chat_obj.quote_message(messageid) +
-                                           f"You are checking {victims[0].screenname} at the end of the night.")
+            if (len(victims) == 1 and victims[0].gamenum != self.gamenum and victims[0].alive
+                    and not self.current_thread.open and self.alive and not self.concussed
+                    and len(self.corrupted_by) == 0 and not self.nightmared and not self.jailed):
+                chat_obj.write_message(chat_obj.quote_message(messageid) +
+                                       f"You are checking {victims[0].screenname} at the end of the night.")
             elif len(victims) != 1 and len(victims) != 2:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only check one  or two people.")
             elif not are_all_alive(victims):
@@ -2206,14 +2222,6 @@ class SpiritSeer(Player):
                 and are_all_alive(victims) and victims[0].gamenum != victims[1].gamenum
                 and not self.current_thread.open and self.alive and not self.concussed
                 and len(self.corrupted_by) == 0 and not self.nightmared and not self.jailed):
-            if victims[0].has_killed is False and victims[1].has_killed is False:
-                chat_obj.write_message(chat_obj.quote_message(messageid) +
-                                       f"{victims[0].screenname} and {victims[1].screenname} are [b]Blue[/b]. "
-                                       f"Neither player killed anyone last night.")
-            else:
-                chat_obj.write_message(chat_obj.quote_message(messageid) +
-                                       f"{victims[0].screenname} and {victims[1].screenname} are [b]Red[/b]. "
-                                       f"One or both players killed someone last night.")
             if len(victims[0].infected_by) > 0:
                 self.infected_by = victims[0].infected_by.copy()
                 self.chat.write_message(
@@ -2222,6 +2230,16 @@ class SpiritSeer(Player):
                 self.infected_by = victims[1].infected_by.copy()
                 self.chat.write_message(
                     f"You have been infected and will die at the end of the day if the Infector is not killed.")
+            if victims[0].has_killed is False and victims[1].has_killed is False:
+                chat_obj.write_message(chat_obj.quote_message(messageid) +
+                                       f"{victims[0].screenname} and {victims[1].screenname} are [b]Blue[/b]. "
+                                       f"Neither player killed anyone last night.")
+                return ['blue']
+            else:
+                chat_obj.write_message(chat_obj.quote_message(messageid) +
+                                       f"{victims[0].screenname} and {victims[1].screenname} are [b]Red[/b]. "
+                                       f"One or both players killed someone last night.")
+                return ['red']
         if (keyword == 'watch' and isinstance(chat_obj, tc.Chat) and len(victims) == 1
                 and victims[0].gamenum != self.gamenum and victims[0].alive and not self.current_thread.open
                 and self.alive and not self.concussed and len(self.corrupted_by) == 0 and not self.nightmared
@@ -2298,6 +2316,7 @@ class ToughGuy(Player):
             victims[0].protected_by['Tough Guy'].append(self)
             chat_obj.write_message(chat_obj.quote_message(messageid) +
                                    f"You attempted to protect {victims[0].screenname} last night.")
+            return ['success']
         return []
 
 
@@ -2358,19 +2377,21 @@ class Violinist(Player):
                 and victims[0].gamenum != self.gamenum and not self.current_thread.open
                 and victims[1].screenname != '' and self.alive and not self.concussed and len(self.corrupted_by) == 0
                 and not self.nightmared and not self.jailed):
+            if len(victims[0].infected_by) > 0:
+                self.infected_by = victims[0].infected_by.copy()
+                self.chat.write_message(
+                    f"You have been infected and will die at the end of the day if the Infector is not killed.")
             if victims[0].apparent_team == victims[1].team:
                 chat_obj.write_message(chat_obj.quote_message(messageid) +
                                        f"{victims[0].screenname} appears to be mourning the death of "
                                        f"{victims[1].screenname}. "
                                        f"They are on the [b]same team[/b].")
+                return ['same']
             else:
                 chat_obj.write_message(chat_obj.quote_message(messageid) +
                                        f"{victims[0].screenname} is not mourning the death of {victims[1].screenname}. "
                                        f"They are on [b]different teams[/b].")
-            if len(victims[0].infected_by) > 0:
-                self.infected_by = victims[0].infected_by.copy()
-                self.chat.write_message(
-                    f"You have been infected and will die at the end of the day if the Infector is not killed.")
+                return ['different']
         elif keyword == 'check' and victims[1].screenname == '':
             chat_obj.write_message(f"Nobody has died, so no info tonight.")
         return []
@@ -2466,6 +2487,7 @@ class Witch(Player):
                 and self.alive and not self.concussed and len(self.corrupted_by) == 0 and not self.nightmared
                 and not self.jailed):
             victims[0].protected_by['Witch'].append(self)
+            return ['success']
         if (keyword == 'poison' and isinstance(chat_obj, tc.Chat) and len(victims) == 1 and victims[0].alive
                 and victims[0].gamenum != self.gamenum and self.has_kill_potion and not self.current_thread.open
                 and self.alive and not self.concussed and len(self.corrupted_by) == 0 and not self.nightmared
@@ -2509,6 +2531,7 @@ class WolfAvenger(Player):
                 chat_obj.write_message(chat_obj.quote_message(messageid) + f"You are currently avenging upon "
                                        f"{victims[0].screenname if self.night > 1 else victims[0].noun}.")
                 self.acting_upon = victims
+                return ['success']
             elif len(victims) != 1:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only tag one person.")
             elif not victims[0].alive:
@@ -2613,6 +2636,7 @@ class ShamanWolf(Player):
                 and len(self.corrupted_by) == 0 and not self.jailed):
             chat_obj.write_message(chat_obj.quote_message(messageid) + f"{victims[0].screenname} has been enchanted.")
             victims[0].shamaned_by.append(self.gamenum)
+            return ['success']
         return []
 
 
@@ -2680,6 +2704,7 @@ class BerserkWolf(Player):
             if victims[0].screenname == 'shortkut' and isinstance(chat_obj, tc.Chat):
                 chat_obj.write_message(f"Wolfbot approves of your desire to murder shortkut, "
                                        f"but the normal wolf vote must be used.")
+            return ['success']
         return []
 
 
@@ -2748,6 +2773,7 @@ class NightmareWolf(Player):
             chat_obj.write_message(chat_obj.quote_message(messageid) +
                                    f"{victims[0].screenname} has been nightmared.")
             victims[0].nightmared = True
+            return ['success']
         return []
 
 
@@ -2818,6 +2844,7 @@ class VoodooWolf(Player):
             victims[0].muted_by[self.night].append(self)
             text = chat_obj.quote_message(messageid) + f"{victims[0].screenname} has been muted."
             chat_obj.write_message(text)
+            return ['success']
         return []
 
 
@@ -2859,6 +2886,7 @@ class GuardianWolf(Player):
                 victims[0].unlynchable_by.append(self)
                 self.acting_upon = victims
                 chat_obj.write_message(text)
+                return ['success']
             elif len(victims) != 1:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only protect one person.")
             elif self.mp < 100:
@@ -2918,6 +2946,7 @@ class WolfTrickster(Player):
                         i.tricked_by.remove(self)
                 victims[0].tricked_by.append(self)
                 self.acting_upon = victims
+                return ['success']
             elif len(victims) != 1:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only trick one person.")
             elif self.mp < 100:
@@ -2999,6 +3028,7 @@ class ConfusionWolf(Player):
             chat_obj.write_message(chat_obj.quote_message(messageid) + f"Wolf Confusion is active.")
             self.confusion = True
             self.mp = self.mp - 50
+            return ['success']
         if victims[0].screenname == 'shortkut' and isinstance(chat_obj, tc.Chat):
             chat_obj.write_message(f"Wolfbot approves of your desire to murder shortkut, "
                                    f"but the normal wolf vote must be used.")
@@ -3128,6 +3158,7 @@ class JellyWolf(Player):
             self.acting_upon = victims
             chat_obj.write_message(chat_obj.quote_message(messageid) +
                                    f"You placed protective jelly on {victims[0].screenname} last night.")
+            return ['success']
         return []
 
 
@@ -3166,6 +3197,7 @@ class ToxicWolf(Player):
                 victims[0].poisoned = True
                 chat_obj.write_message(chat_obj.quote_message(messageid) + f"{victims[0].screenname} has "
                                                                            f"been poisoned.")
+                return ['success']
             elif len(victims) != 1:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only poison one person.")
             elif self.mp < 50:
@@ -3273,6 +3305,7 @@ class WolfScribe(Player):
                     self.acting_upon = [victims[0]]
                     victims[0].scribe_method.append([names[ind], victims[1]])
                     victims[0].scribed_by.append(self)
+                return ['success']
             elif (self.mp >= 50 and len(victims) == 2 and isinstance(victims[0], Player)
                   and not self.current_thread.open and self.alive and not self.concussed
                   and len(self.corrupted_by) == 0 and not self.jailed and victims[0].alive):
@@ -3306,6 +3339,7 @@ class WolfScribe(Player):
                     self.acting_upon = [victims[0]]
                     victims[0].scribe_method.append(['', names[ind]])
                     victims[0].scribed_by.append(self)
+                return ['success']
             elif (len(victims) != 2 and len(victims) != 3) or not isinstance(victims[0], Player):
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "Reformat your request, you must change "
                                                                            "either a role or death method.")
@@ -3400,14 +3434,7 @@ class BlindWolf(Player):
                                        f"{victims[1].screenname if self.night > 1 else victims[1].noun} "
                                        f"is the {victims[1].category}.")
                 self.checked = 2
-                if len(victims[0].infected_by) > 0:
-                    self.infected_by = victims[0].infected_by.copy()
-                    self.chat.write_message(
-                        f"You have been infected and will die at the end of the day if the Infector is not killed.")
-                if len(victims[1].infected_by) > 0:
-                    self.infected_by = victims[1].infected_by.copy()
-                    self.chat.write_message(
-                        f"You have been infected and will die at the end of the day if the Infector is not killed.")
+                return [f'{victims[0].category}, {victims[1].category}']
             if (len(victims) == 1 and victims[0].alive and victims[0].wolf_targetable and self.checked < 2
                     and not self.resigned and not self.current_thread.open and not self.jailed and not self.concussed
                     and self.alive and not self.concussed and len(self.corrupted_by) == 0):
@@ -3415,10 +3442,7 @@ class BlindWolf(Player):
                                        f"{victims[0].screenname if self.night > 1 else victims[0].noun}"
                                        f" is the {victims[0].category}.")
                 self.checked = self.checked + 1
-                if len(victims[0].infected_by) > 0:
-                    self.infected_by = victims[0].infected_by.copy()
-                    self.chat.write_message(
-                        f"You have been infected and will die at the end of the day if the Infector is not killed.")
+                return [f'{victims[0].category}']
             elif len(victims) != 1 and len(victims) != 2:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only check one or two people.")
             elif not are_all_alive(victims):
@@ -3486,6 +3510,7 @@ class WolfSeer(Player):
                                        f"{victims[0].screenname if self.night > 1 else victims[0].noun}"
                                        f" is the {victims[0].role}.")
                 self.checked = self.checked + 1
+                return [f'{victims[0].role}']
             elif len(victims) != 1:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only check one person.")
             elif not victims[0].alive:
@@ -3556,6 +3581,7 @@ class Sorcerer(Player):
                                         f" is the {victims[0].role}.")
                 self.checked = self.checked + 1
                 self.seen.append(victims[0])
+                return [f'{victims[0].role}']
             elif len(victims) != 1:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only check one person.")
             elif not victims[0].alive:
@@ -3644,6 +3670,7 @@ class WerewolfFan(Player):
                                        f"You will reveal your role to "
                                        f"{victims[0].screenname if self.night > 1 else victims[0].noun} "
                                        f"at the start of the next night.")
+                return ['success']
             elif len(victims) != 1:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only reveal to one person.")
             elif not victims[0].alive:
@@ -3699,7 +3726,7 @@ class Cupid(Player):
                     and self.gamenum != victims[0].gamenum and self.gamenum != victims[1].gamenum and self.alive):
                 chat_obj.write_message(chat_obj.quote_message(messageid) +
                                        f"You will attempt to couple {victims[0].screenname} "
-                                       f"and {victims[0].screenname}.")
+                                       f"and {victims[1].screenname}.")
             elif len(victims) != 2 or victims[1].gamenum != victims[0].gamenum:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You must only couple two different people.")
             elif victims[0].gamenum == self.gamenum or victims[1].gamenum == self.gamenum:
@@ -3717,9 +3744,11 @@ class Cupid(Player):
                 and self.gamenum != victims[0].gamenum and self.gamenum != victims[1].gamenum):
             victims[0].coupled = True
             victims[1].coupled = True
+            return [f'{victims[0].screenname}, {victims[1].screenname}']
         if (keyword == 'couple' and len(victims) == 1 and are_all_alive(victims) and isinstance(chat_obj, tc.Chat)
                 and self.night == 1 and self.gamenum != victims[0].gamenum):
             victims[0].coupled = True
+            return [f'{victims[0].screenname}']
         return []
 
 
@@ -3860,12 +3889,14 @@ class Alchemist(Player):
             victims[0].black_potion = True
             victims[0].chat.write_message("You've received a potion! "
                                           "You can't tell what color it is...you might die today.")
+            return ['success']
         if (keyword == 'potion' and isinstance(chat_obj, tc.Chat) and len(victims) == 1 and victims[0].alive
                 and self.gamenum != victims[0].gamenum and not self.current_thread.open and self.alive
                 and not self.concussed and len(self.corrupted_by) == 0 and not self.nightmared and not self.jailed):
             victims[0].red_potion = victims[0].red_potion + 1
             victims[0].chat.write_message("You've received a potion! "
                                           "You can't tell what color it is...you might die today.")
+            return ['success']
         return []
 
 
@@ -3977,6 +4008,7 @@ class Arsonist(Player):
             victims[0].doused_by.append(self)
             victims[1].doused_by.append(self)
             self.action_used = True
+            return ['success']
         if (keyword == 'douse' and isinstance(chat_obj, tc.Chat) and len(victims) == 1
                 and self.gamenum != victims[0].gamenum and not self.current_thread.open
                 and self.alive and not self.concussed and len(self.corrupted_by) == 0 and not self.nightmared
@@ -3986,6 +4018,7 @@ class Arsonist(Player):
             self.acting_upon.append(victims[0])
             victims[0].doused_by.append(self)
             self.action_used = True
+            return ['success']
         return []
 
 
@@ -4049,6 +4082,7 @@ class Corruptor(Player):
                 and not self.jailed and not self.current_thread.open and self.gamenum != victims[0].gamenum):
             victims[0].corrupted_by.append(self)
             self.acting_upon.append(victims[0])
+            return ['success']
         return []
 
 
@@ -4188,6 +4222,7 @@ class CultLeader(Player):
             chat_obj.write_message(chat_obj.quote_message(messageid) +
                                    f"You successfully converted {victims[0].screenname} to the cult.")
             victims[0].chat.write_message(f"You have been converted to the cult.")
+            return ['success']
         elif (keyword == 'sacrifice' and isinstance(chat_obj, tc.Chat) and len(victims) == 1 and victims[0].alive
               and self.alive and not self.concussed and len(self.corrupted_by) == 0 and not self.nightmared
               and not self.jailed and self.gamenum != victims[0].gamenum and victims[0].cult
@@ -4277,6 +4312,7 @@ class EvilDetective(Player):
                 chat_obj.write_message(chat_obj.quote_message(messageid) +
                                        f"{victims[0].screenname} and "
                                        f"{victims[1].screenname} are on the [b]same team[/b].")
+                return ['same']
         return []
 
 
@@ -4363,6 +4399,7 @@ class Illusionist(Player):
                                    f"You have disguised {victims[0].screenname}.")
             victims[0].disguised_by.append(self)
             self.acting_upon.append(victims[0])
+            return ['success']
         return []
 
 
@@ -4427,7 +4464,7 @@ class Infector(Player):
             victims[0].chat.write_message(
                 f"You have been infected and will die at the end of the day if the Infector is not killed.")
             self.acting_upon.append(victims[0])
-            return ['infector', self, victims[0]]
+            return ['success']
         return []
 
 

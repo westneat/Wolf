@@ -381,45 +381,44 @@ class Game:
             else:
                 all_alive = False
                 tag_list = tag_list + '[s]@' + i + '[/s]' + '\n'
-        text = (f'''The day will start at [TIME=datetime]{self.night_close_tm.strftime('%Y-%m-%dT%H:%M:%S-0500')}[/TIME]
+        text1 = f'''The day will start at [TIME=datetime]{self.night_close_tm.strftime('%Y-%m-%dT%H:%M:%S-0500')}[/TIME]
         
         Dictionary: https://gwforums.com/threads/zell-wolf-role-dictionary-and-hall-of-fame.427/
-
-Here's the list of players:
-
-{tag_list}
-And here are the remaining roles:
-
-Village team:
-{self.rsv}x Random Strong Villagers
-{self.rrv}x Random Regular Villagers
-
-''' +
-                ('Note: There will be NO MORE than one person who has a "speak with the dead" role. '
+        
+        Here's the list of players:
+        
+        {tag_list}
+        And here are the remaining roles:
+        
+        Village team:
+        {self.rsv}x Random Strong Villagers
+        {self.rrv}x Random Regular Villagers
+        
+        '''
+        text2 = ('Note: There will be NO MORE than one person who has a "speak with the dead" role. '
                  'There will also be no more than one person with a "lock players up at night" role. '
-                 'There may be none of either, but there will not be multiple.') + f'''
+                 'There may be none of either, but there will not be multiple.\n\n')
 
-Wolf team:
-{self.rww}x Random Wolves
-
-The werewolves can be any of the numbered wolves (except regular werewolf) listed in the dictionary.
-
-Solo team:
-{self.rk}x Random Killer
-
-Wildcard Role:
-{self.rv}x Random Fool/Headhunter/Werewolf Fan/Cupid
-
-If the Werewolf Fan is selected, one wolf will become the Sorcerer.
-
-Rules:
-[spoiler]
-Nights will be 12 hours and days will be 24 hours. The end of the next period will be clearly posted.
-
-You may edit your posts. If you somehow manage to edit out an action before the bot reads it, then it won't count.
-
-''' +
-                ('Votes will be conducted via poll. The poll will close exactly at the deadline. '
+        text3 = f'''Wolf team:
+        {self.rww}x Random Wolves
+        
+        The werewolves can be any of the numbered wolves (except regular werewolf) listed in the dictionary.
+        
+        Solo team:
+        {self.rk}x Random Killer
+        
+        Wildcard Role:
+        {self.rv}x Random Fool/Headhunter/Werewolf Fan/Cupid
+        
+        If the Werewolf Fan is selected, one wolf will become the Sorcerer.
+        
+        Rules:
+        [spoiler]
+        Nights will be 12 hours and days will be 24 hours. The end of the next period will be clearly posted.
+        
+        You may edit your posts. If you manage to edit out an action before the bot reads it, then it won't count.
+        '''
+        text4 = ('Votes will be conducted via poll. The poll will close exactly at the deadline. '
                  'You have unlimited changes until that point.\n\n'
                  'There will be a minimum number of votes required to lynch. '
                  'In the event of a tie, nobody is lynched. '
@@ -433,81 +432,81 @@ You may edit your posts. If you somehow manage to edit out an action before the 
                  'Please use this forum for all discussion by dead players about the game. '
                  'Alive players can talk during the main thread during the day.\n\n'
                  'It is possible, if very unlikely, for the game to end in a tie if every single player is killed. '
-                 'The game also ends in a tie if there are no deaths for three straight days and nights.') + f'''
+                 'The game also ends in a tie if there are no deaths for three straight days and nights.')
 
-[/spoiler]
-Night events will go in the following priority order regardless of when the PMs are sent:
-[spoiler]
-Wolf Nightmare activates
-Wolf Shaman activates
-Werewolf fan reveals
-Confusion activates
-Trickster set
-Wolf Avenger / Avenger tag
-Loudmouth tag
-Player gets Jailed
-Wolves break out of warden prison
-Warden weapon used
-Voodoo wolf / Librarian mute
-Medium/Ritualist revive spell
-Blind wolf/Wolf seer/Sorcerer check
-Blind wolf/Wolf seer/Sorcerer choice to resign
-Blind Wolf check
-Flagger redirect
-Doctor protect
-Jailer/Warden protect
-Bodyguard protect
-Witch protect
-Tough Guy protect
-Defender protect
-Forger Item Completed
-Jelly Wolf Protect
-Illusionist disguise
-Infector attack
-Violinist check + gets results
-Detective check + gets results
-Aura Seer checks + gets results
-Spirit Seer check
-Sheriff check
-Bell Ringer places bells
-Preacher watch
-Marksman shot
-Witch kill (if not killed by marksman, otherwise potion unused)
-Jailer kill (if not killed by marksman/witch)
-Red Lady visit
-Revived players return from the dead (cannot be targeted by wolves/solo in same night)
-Beast Hunter picks up trap (if moved)
-Forger Item Selection
-Solo killer attack
-Wolf berserk mode activates
-Wolves kill
-Spirit Seer gets results
-Sheriff gets results
-Beast Hunter places trap
-Forger Item Gifted
-Cupid selection
-[/spoiler]
+        text5 = f'''[/spoiler]
+        Night events will go in the following priority order regardless of when the PMs are sent:
+        [spoiler]
+        Wolf Nightmare activates
+        Wolf Shaman activates
+        Werewolf fan reveals
+        Confusion activates
+        Trickster set
+        Wolf Avenger / Avenger tag
+        Loudmouth tag
+        Player gets Jailed
+        Wolves break out of warden prison
+        Warden weapon used
+        Voodoo wolf / Librarian mute
+        Medium/Ritualist revive spell
+        Blind wolf/Wolf seer/Sorcerer check
+        Blind wolf/Wolf seer/Sorcerer choice to resign
+        Blind Wolf check
+        Flagger redirect
+        Doctor protect
+        Jailer/Warden protect
+        Bodyguard protect
+        Witch protect
+        Tough Guy protect
+        Defender protect
+        Forger Item Completed
+        Jelly Wolf Protect
+        Illusionist disguise
+        Infector attack
+        Violinist check + gets results
+        Detective check + gets results
+        Aura Seer checks + gets results
+        Spirit Seer check
+        Sheriff check
+        Bell Ringer places bells
+        Preacher watch
+        Marksman shot
+        Witch kill (if not killed by marksman, otherwise potion unused)
+        Jailer kill (if not killed by marksman/witch)
+        Red Lady visit
+        Revived players return from the dead (cannot be targeted by wolves/solo in same night)
+        Beast Hunter picks up trap (if moved)
+        Forger Item Selection
+        Solo killer attack
+        Wolf berserk mode activates
+        Wolves kill
+        Spirit Seer gets results
+        Sheriff gets results
+        Beast Hunter places trap
+        Forger Item Gifted
+        Cupid selection
+        [/spoiler]
+        
+        In the event that two of the same role perform the exact same action, they will both be credited.
+        
+        Winning Conditions:'''
 
-In the event that two of the same role perform the exact same action, they will both be credited.
+        text6 = (f"{'[s]' if self.rsv + self.rrv == 0 else ''}Village: Kill {'[s]' if self.rww == 0 else ''}"
+                 f"all wolves {'[s]' if self.rk == 0 else ''}and {'[/s]' if self.rww == 0 else ''}"
+                 f"the solo killer.{'[/s]' if self.rk == 0 else ''} "
+                 f"{'[/s]' if self.rsv + self.rrv == 0 else ''}\n\n{'[s]' if self.rww == 0 else ''}"
+                 f"Wolves: {'[s]' if self.rk == 0 else ''}Kill the solo killer."
+                 f"{'[/s]' if self.rk == 0 else ''} "
+                 f"Afterwards, once the wolves make up half the total players, the wolves win. "
+                 f"{'[/s]' if self.rww == 0 else ''}\n\n{'[s]' if self.rk == 0 else ''}"
+                 f"Solo Killer: Kill all other players.{'[/s]' if self.rk == 0 else ''}\n\n"
+                 f"{'[s]' if self.rv == 0 else ''}Wildcard Role: Satisfy your winning condition. "
+                 f"Your winning condition trumps any other that may occur at the same time. "
+                 f"(For example, if you lynch the fool and it creates a situation where there are 3 wolves left "
+                 f"and 3 villagers, the Fool wins only).{'[/s]' if self.rv == 0 else ''}\n")
 
-Winning Conditions:
-
-''' +
-                f"{'[s]' if self.rsv + self.rrv == 0 else ''}Village: Kill {'[s]' if self.rww == 0 else ''}"
-                f"all wolves {'[s]' if self.rk == 0 else ''}and {'[/s]' if self.rww == 0 else ''}"
-                f"the solo killer.{'[/s]' if self.rk == 0 else ''} "
-                f"{'[/s]' if self.rsv + self.rrv == 0 else ''}\n\n{'[s]' if self.rww == 0 else ''}"
-                f"Wolves: {'[s]' if self.rk == 0 else ''}Kill the solo killer."
-                f"{'[/s]' if self.rk == 0 else ''} "
-                f"Afterwards, once the wolves make up half the total players, the wolves win. "
-                f"{'[/s]' if self.rww == 0 else ''}\n\n{'[s]' if self.rk == 0 else ''}"
-                f"Solo Killer: Kill all other players.{'[/s]' if self.rk == 0 else ''}\n\n"
-                f"{'[s]' if self.rv == 0 else ''}Wildcard Role: Satisfy your winning condition. "
-                f"Your winning condition trumps any other that may occur at the same time. "
-                f"(For example, if you lynch the fool and it creates a situation where there are 3 wolves left "
-                f"and 3 villagers, the Fool wins only).{'[/s]' if self.rv == 0 else ''}\n" +
-                self.actions if not all_alive else '')
-        return text
+        text7 = self.actions if not all_alive else ''
+        return text1 + text2 + text3 + text4 + text5 + text6 + text7
 
     # can be chat or thread pieces passed in
     def get_keyword_phrases(self, pieces, dedupe=True, new=False):

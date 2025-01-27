@@ -2,22 +2,15 @@ import game as gm
 import time
 import datetime
 
-wolf = gm.Game([47, 157, 62, 101, 45, 65, 7, 40, 4, 8, 100, 82, 128, 67, 306, 18], "Wolfbot Beta Deux")
+wolf = gm.Game([47, 157, 62, 101, 45, 65, 7, 40, 4, 8, 100, 82, 128, 67, 306, 18], "Wolfbot UAT")
 
-wolf = gm.Game([47, 157, 62, 101, 45, 65, 7, 40, 4, 8, 100, 82, 128, 67, 306, 18], "Wolfbot Beta Threes")
+wolf.assign_player_numbers()
+wolf.assign_roles()
 
-#wolf.assign_player_numbers()
-#wolf.assign_roles()
+# wolf.resume("Wolfbot UAT")
 
-#wolf.resume("Wolfbot Beta Deux")
-
-wolf.resume("Wolfbot Beta Threes")
-
-flag = True
 while not wolf.game_over:
-    if not flag:
-        wolf.start_night()
-    flag = False
+    wolf.start_night()
     if wolf.game_over:
         break
     new_thread = False
