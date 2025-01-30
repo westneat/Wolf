@@ -613,6 +613,9 @@ class Game:
                 post_ids.append(pot_votes[0][i])  # returns post_id
                 posters.append(pot_votes[1][i])  # returns poster_id as role obj
                 votes.append(pot_votes[3][i][0])  # returns who voted for as role obj
+            elif len(pot_votes[3][i]) == 0:
+                self.wolf_chat.write_message(self.wolf_chat.quote_message(pot_votes[0][i]) +
+                                             f"This is not a valid vote for a current player.")
         for i in range(len(votes)):
             if not posters[i].jailed:
                 if not posters[i].concussed:
@@ -682,6 +685,7 @@ class Game:
         # save old attributes we want to carry over
         acting_upon = old_role.acting_upon
         action_used = old_role.action_used
+        conjuror_acted = old_role.conjuror_acted
         alive = old_role.alive
         attacking = old_role.attacking
         bell_ringer_watched_by = old_role.bell_ringer_watched_by
@@ -738,72 +742,75 @@ class Game:
         votes = old_role.votes
         warden_eligible = old_role.warden_eligible
         current_thread = old_role.current_thread
+        temp_role = copy.deepcopy(new_role)
         # swap current role to brand new role
-        self.role_dictionary[old_role.gamenum] = new_role
+        self.role_dictionary[gamenum] = copy.deepcopy(new_role)
         # everyone that was acting on the old role needs to be pointed to new one
         for player in self.role_dictionary:
             for i, actings in enumerate(self.role_dictionary[player].acting_upon):
                 if actings == old_role:
                     self.role_dictionary[player].acting_upon[i] = new_role
         # populate our new role with all of our saved attributes
-        new_role.acting_upon = acting_upon
-        new_role.action_used = action_used
-        new_role.alive = alive
-        new_role.attacking = attacking
-        new_role.bell_ringer_watched_by = bell_ringer_watched_by
-        new_role.black_potion = black_potion
-        new_role.can_jail = can_jail
-        new_role.category = category
-        new_role.chat = chat
-        new_role.concussed = concussed
-        new_role.conjuror = conjuror
-        new_role.corrupted_by = corrupted_by
-        new_role.coupled = coupled
-        new_role.cult = cult
-        new_role.disguised_by = disguised_by
-        new_role.doused_by = doused_by
-        new_role.first_seer = first_seer
-        new_role.forger_guns = forger_guns
-        new_role.forger_shields = forger_shields
-        new_role.gamenum = gamenum
-        new_role.given_warden_weapon = given_warden_weapon
-        new_role.guns_forged = guns_forged
-        new_role.has_been_concussed = has_been_concussed
-        new_role.has_forger_gun = has_forger_gun
-        new_role.has_forger_shield = has_forger_shield
-        new_role.has_kill_potion = has_kill_potion
-        new_role.has_killed = has_killed
-        new_role.has_protect_potion = has_protect_potion
-        new_role.hhtarget = hhtarget
-        new_role.infected_by = infected_by
-        new_role.instigated = instigated
-        new_role.jailed = jailed
-        new_role.jellied_by = jellied_by
-        new_role.last_thread_id = last_thread_id
-        new_role.mp = mp
-        new_role.muted_by = muted_by
-        new_role.night = night
-        new_role.night_killed = night_killed
-        new_role.nightmared = nightmared
-        new_role.noun = noun
-        new_role.poisoned = poisoned
-        new_role.preacher_watched_by = preacher_watched_by
-        new_role.protected_by = protected_by
-        new_role.red_potion = red_potion
-        new_role.screenname = screenname
-        new_role.scribe_method = scribe_method
-        new_role.scribed_by = scribed_by
-        new_role.seer_apprentice = seer_apprentice
-        new_role.shadow = shadow
-        new_role.shamaned_by = shamaned_by
-        new_role.sheriff_watched_by = sheriff_watched_by
-        new_role.shields_forged = shields_forged
-        new_role.spelled = spelled
-        new_role.tricked_by = tricked_by
-        new_role.unlynchable_by = unlynchable_by
-        new_role.votes = votes
-        new_role.warden_eligible = warden_eligible
-        new_role.current_thread = current_thread
+        self.role_dictionary[gamenum].acting_upon = acting_upon
+        self.role_dictionary[gamenum].action_used = action_used
+        self.role_dictionary[gamenum].new_role = temp_role
+        self.role_dictionary[gamenum].conjuror_acted = conjuror_acted
+        self.role_dictionary[gamenum].alive = alive
+        self.role_dictionary[gamenum].attacking = attacking
+        self.role_dictionary[gamenum].bell_ringer_watched_by = bell_ringer_watched_by
+        self.role_dictionary[gamenum].black_potion = black_potion
+        self.role_dictionary[gamenum].can_jail = can_jail
+        self.role_dictionary[gamenum].category = category
+        self.role_dictionary[gamenum].chat = chat
+        self.role_dictionary[gamenum].concussed = concussed
+        self.role_dictionary[gamenum].conjuror = conjuror
+        self.role_dictionary[gamenum].corrupted_by = corrupted_by
+        self.role_dictionary[gamenum].coupled = coupled
+        self.role_dictionary[gamenum].cult = cult
+        self.role_dictionary[gamenum].disguised_by = disguised_by
+        self.role_dictionary[gamenum].doused_by = doused_by
+        self.role_dictionary[gamenum].first_seer = first_seer
+        self.role_dictionary[gamenum].forger_guns = forger_guns
+        self.role_dictionary[gamenum].forger_shields = forger_shields
+        self.role_dictionary[gamenum].gamenum = gamenum
+        self.role_dictionary[gamenum].given_warden_weapon = given_warden_weapon
+        self.role_dictionary[gamenum].guns_forged = guns_forged
+        self.role_dictionary[gamenum].has_been_concussed = has_been_concussed
+        self.role_dictionary[gamenum].has_forger_gun = has_forger_gun
+        self.role_dictionary[gamenum].has_forger_shield = has_forger_shield
+        self.role_dictionary[gamenum].has_kill_potion = has_kill_potion
+        self.role_dictionary[gamenum].has_killed = has_killed
+        self.role_dictionary[gamenum].has_protect_potion = has_protect_potion
+        self.role_dictionary[gamenum].hhtarget = hhtarget
+        self.role_dictionary[gamenum].infected_by = infected_by
+        self.role_dictionary[gamenum].instigated = instigated
+        self.role_dictionary[gamenum].jailed = jailed
+        self.role_dictionary[gamenum].jellied_by = jellied_by
+        self.role_dictionary[gamenum].last_thread_id = last_thread_id
+        self.role_dictionary[gamenum].mp = mp
+        self.role_dictionary[gamenum].muted_by = muted_by
+        self.role_dictionary[gamenum].night = night
+        self.role_dictionary[gamenum].night_killed = night_killed
+        self.role_dictionary[gamenum].nightmared = nightmared
+        self.role_dictionary[gamenum].noun = noun
+        self.role_dictionary[gamenum].poisoned = poisoned
+        self.role_dictionary[gamenum].preacher_watched_by = preacher_watched_by
+        self.role_dictionary[gamenum].protected_by = protected_by
+        self.role_dictionary[gamenum].red_potion = red_potion
+        self.role_dictionary[gamenum].screenname = screenname
+        self.role_dictionary[gamenum].scribe_method = scribe_method
+        self.role_dictionary[gamenum].scribed_by = scribed_by
+        self.role_dictionary[gamenum].seer_apprentice = seer_apprentice
+        self.role_dictionary[gamenum].shadow = shadow
+        self.role_dictionary[gamenum].shamaned_by = shamaned_by
+        self.role_dictionary[gamenum].sheriff_watched_by = sheriff_watched_by
+        self.role_dictionary[gamenum].shields_forged = shields_forged
+        self.role_dictionary[gamenum].spelled = spelled
+        self.role_dictionary[gamenum].tricked_by = tricked_by
+        self.role_dictionary[gamenum].unlynchable_by = unlynchable_by
+        self.role_dictionary[gamenum].votes = votes
+        self.role_dictionary[gamenum].warden_eligible = warden_eligible
+        self.role_dictionary[gamenum].current_thread = current_thread
 
     def create_wolf_chat(self):
         wolves_id = []  # holds member ids
@@ -834,7 +841,7 @@ class Game:
     # simply getting the necessary attributes from many different chat/thread objects
     def multiple_conv_pieces(self):
         night_dict = {'messageids': [], 'userids': [], 'messages': [], 'reacted': [], 'time': [], 'chat': []}
-        if self.cupid.gamenum != 0:
+        if self.cupid.gamenum != 0 and self.night != 1:
             [messageids, userids, messages, reacted, time] = self.lover_chat.convo_pieces()
             night_dict['messageids'].extend(messageids)
             night_dict['userids'].extend(userids)
@@ -986,47 +993,54 @@ class Game:
         [postids, posters, actions, victims, times, chats] = \
             [chat_items[0], chat_items[1], chat_items[2], chat_items[3], chat_items[4], chat_items[5]]
         for i in range(len(postids)):
-            if (posters[i].role in rolelist and not posters[i].jailed and
-                    not posters[i].concussed and not posters[i].nightmared and
-                    datetime.datetime.fromtimestamp(times[i]) > self.day_open_tm):
-                if posters[i].role == 'Violinist':
-                    victims[i].append(self.first_death)
-                outcome = posters[i].phased_action(postids[i], actions[i].lower(), victims[i], chats[i])
-                if len(outcome) == 3:
-                    self.secondary_text = ''
-                    self.new_thread_text = self.new_thread_text + self.kill_player(outcome[0], outcome[1], outcome[2])
-                    phase = f"Day {self.night - 1}" if self.day_thread.open else f'Night {self.night}'
-                    self.log['Phase'].append(phase)
-                    self.log['Player'].append(posters[i].screenname)
-                    text = ''
-                    for k, victim in enumerate(victims[i]):
-                        if k == len(victims[i]) - 1:
-                            text = text + victim.screenname
-                        else:
-                            text = text + victim.screenname + ', '
-                    self.log['Action'].append(actions[i].lower() + " " + text)
-                    self.log['Result'].append("success")
-                if len(outcome) == 2 and outcome[0] == 'vote':
-                    self.manual_votes = outcome[1]
-                    self.secondary_text = ''
-                    self.new_thread_text = self.new_thread_text + self.kill_player(outcome[0], outcome[1], outcome[2])
-                    phase = f"Day {self.night - 1}" if self.day_thread.open else f'Night {self.night}'
-                    self.log['Phase'].append(phase)
-                    self.log['Player'].append(posters[i].screenname)
-                    text = ''
-                    for k, victim in enumerate(victims[i]):
-                        if k == len(victims[i]) - 1:
-                            text = text + victim.screenname
-                        else:
-                            text = text + victim.screenname + ', '
-                    self.log['Action'].append(actions[i].lower() + " " + text)
-                    self.log['Result'].append("success")
-            elif posters[i].jailed:
-                posters[i].chat.write_message("You are still jailed and cannot act.")
-            elif posters[i].concussed:
-                posters[i].chat.write_message("You are concussed and cannot act.")
-            elif posters[i].nightmared:
-                posters[i].chat.write_message("You are in a deep sleep (nightmared) and cannot act.")
+            if posters[i].role in rolelist and datetime.datetime.fromtimestamp(times[i]) > self.day_open_tm:
+                if not posters[i].jailed and not posters[i].concussed and not posters[i].nightmared:
+                    if posters[i].role == 'Violinist':
+                        victims[i].append(self.first_death)
+                    outcome = posters[i].phased_action(postids[i], actions[i].lower(), victims[i], chats[i])
+                    if len(outcome) == 3:
+                        self.secondary_text = ''
+                        self.new_thread_text = self.new_thread_text + self.kill_player(outcome[0],
+                                                                                       outcome[1],
+                                                                                       outcome[2])
+                        phase = f"Day {self.night - 1}" if self.day_thread.open else f'Night {self.night}'
+                        self.log['Phase'].append(phase)
+                        self.log['Player'].append(posters[i].screenname)
+                        text = ''
+                        for k, victim in enumerate(victims[i]):
+                            if k == len(victims[i]) - 1:
+                                text = text + victim.screenname
+                            else:
+                                text = text + victim.screenname + ', '
+                        self.log['Action'].append(actions[i].lower() + " " + text)
+                        self.log['Result'].append("success")
+                    if len(outcome) == 2 and outcome[0] == 'vote':
+                        self.manual_votes = outcome[1]
+                        self.secondary_text = ''
+                        self.new_thread_text = self.new_thread_text + self.kill_player(outcome[0],
+                                                                                       outcome[1],
+                                                                                       outcome[2])
+                        phase = f"Day {self.night - 1}" if self.day_thread.open else f'Night {self.night}'
+                        self.log['Phase'].append(phase)
+                        self.log['Player'].append(posters[i].screenname)
+                        text = ''
+                        for k, victim in enumerate(victims[i]):
+                            if k == len(victims[i]) - 1:
+                                text = text + victim.screenname
+                            else:
+                                text = text + victim.screenname + ', '
+                        self.log['Action'].append(actions[i].lower() + " " + text)
+                        self.log['Result'].append("success")
+                elif posters[i].jailed:
+                    posters[i].chat.write_message(posters[i].chat.quote_message(postids[i]) + "You are still jailed "
+                                                                                              "and cannot act.")
+                elif posters[i].concussed:
+                    posters[i].chat.write_message(posters[i].chat.quote_message(postids[i]) + "You are concussed "
+                                                                                              "and cannot act.")
+                elif posters[i].nightmared:
+                    posters[i].chat.write_message(posters[i].chat.quote_message(postids[i]) + "You are in a deep sleep "
+                                                                                              "(nightmared) and cannot "
+                                                                                              "act.")
 
     def solo_attack(self, rolelist):
         # Go through all players, but we only care about the solo killers
@@ -1377,6 +1391,8 @@ class Game:
         # Phase 14
         self.phased_actions(['Forger'], chat_items)
 
+        self.phased_actions(['Cupid'], chat_items)
+
         # PHASE LAST
         for i in self.role_dictionary:
             player = self.role_dictionary[i]
@@ -1426,6 +1442,7 @@ class Game:
             player = self.role_dictionary[i]
             player.night += 1
             player.action_used = False
+            player.conjuror_acted = False
             player.skipped = False
             if player.alive:
                 player.chat.write_message(f"It is now Day {self.night}.")
@@ -1470,10 +1487,9 @@ class Game:
                     couple_num.append(rand)
                     self.couple.append(self.role_dictionary[rand])
                     self.role_dictionary[rand].coupled = True
-            cupid_message = cupid_message + (f'[b]{self.couple[0].screenname}[/b] is number {self.couple[0].gamenum}.'
-                                             f' They are the [b]{self.couple[0].role}.[/b]\n\n'
-                                             f'[b]{self.couple[1].screenname}[/b] is number {self.couple[1].gamenum}.'
-                                             f' They are the [b]{self.couple[1].role}.[/b]')
+            cupid_message = (cupid_message +
+                             (f'[b]{self.couple[0].screenname}[/b] is the [b]{self.couple[0].role}.[/b]\n\n'
+                              f'[b]{self.couple[1].screenname}[/b] is the [b]{self.couple[1].role}.[/b]'))
             self.lover_chat.create_conversation(f"{self.game_title} Lovers Chat", cupid_message,
                                                 [self.gamenum_to_memberid(self.couple[0].gamenum),
                                                  self.gamenum_to_memberid(self.couple[1].gamenum)])
@@ -1557,7 +1573,6 @@ class Game:
                                                        f"{self.day_close_tm.strftime('%Y-%m-%dT%H:%M:%S-0500')}[/TIME]")
         self.day_thread.write_message(self.new_thread_text)
         self.new_thread_text = ''
-        self.output_data()
         if self.night == 1:
             self.day_thread.write_message(self.print_nouns())
         self.night += 1
@@ -1566,6 +1581,7 @@ class Game:
         for i in post_list:
             if self.role_dictionary[self.name_to_gamenum(i)].alive:
                 tag_list = tag_list + '@' + i + '\n'
+        self.output_data()
         self.day_thread.write_message(tag_list)
 
     def end_day(self):
@@ -1743,8 +1759,6 @@ class Game:
         # Go through each player chat and get any actions
         for i in self.role_dictionary:
             player = self.role_dictionary[i]
-            if player.conjuror is True and player.new_role.role != player.role:
-                self.role_swap(player, player.new_role)
             chat_pieces = player.chat.convo_pieces()
             chat = [player.chat for _ in range(len(chat_pieces[0]))]
             chat_pieces.append(chat)
@@ -1877,6 +1891,8 @@ class Game:
                 self.day_thread.seen_post(post)
         for i in self.role_dictionary:
             player = self.role_dictionary[i]
+            if player.conjuror is True and player.new_role.role != player.role and player.new_role.gamenum != 0:
+                self.role_swap(player, player.new_role)
             if player.skipped and player in self.to_skip:
                 del self.to_skip[self.to_skip.index(player)]
         if len(self.to_skip) == 0:
@@ -2036,7 +2052,7 @@ class Game:
         [messageids, userids, messages, reacted, time, chat] = self.multiple_conv_pieces()
         pieces = [messageids, userids, messages, reacted, time, chat]
         for i, message in enumerate(pieces[0]):
-            if pieces[3][i] is False:
+            if pieces[3][i] is False and userids[i] != bot_member_id:
                 chat[i].seen_message(message)
         [postids, posters, actions, victims, _, chats] = self.get_keyword_phrases(pieces, new=True)
         for i in range(len(postids)):
@@ -2082,6 +2098,9 @@ class Game:
                     delindex = victim.jellied_by.index(jellier)
                     del victim.jellied_by[delindex]
                 jellier.chat.write_message(f"Your protection on {victim.screenname} has been consumed. ")
+            victim.black_potion = False
+            if victim.red_potion > 1:
+                victim.red_potion = 0
             return 'The Jelly Wolf protection has been consumed. '
         if victim.role == 'Werewolf Fan' and actual_method in ['wolf', 'toxic']:
             self.role_swap(victim, role.Werewolf())
@@ -2090,7 +2109,10 @@ class Game:
             self.create_wolf_chat()
             return ''
         if victim.role == 'Alpha Wolf' and victim.extra_life:
-            victim.extra_list = False
+            victim.extra_life = False
+            victim.black_potion = False
+            if victim.red_potion > 1:
+                victim.red_potion = 0
             return 'The Alpha Wolf has been attacked.'
         if len(victim.scribed_by) > 0:
             scribe_data = victim.scribe_method[-1]  # Take most recent scribed info
@@ -2115,6 +2137,8 @@ class Game:
         victim.has_been_concussed = False
         victim.nightmared = False
         victim.infected_by = []
+        victim.conjuror_acted = False
+        victim.action_used = False
         victim.protected_by = {'Flagger': [],
                                'Doctor': [],
                                'Jailer': [],
@@ -2240,7 +2264,7 @@ class Game:
                 if player.role == 'Seer Apprentice':
                     victim.first_seer = True
                     player.chat.write_message(f"Due to [b]{victim.screenname}'s[/b] death, "
-                                              f"you have converted the role of [b]{victim.role}[/b].")
+                                              f"you have converted to the role of [b]{victim.role}[/b].")
                     self.role_swap(player, victim)
 
         elif victim.role in ['Avenger', 'Wolf Avenger']:

@@ -177,6 +177,7 @@ class Player:
                              }
         self.conjuror = False
         self.conjuror_can_take = True
+        self.conjuror_acted = False
         self.new_role = 0
         self.jailed = False
         self.given_warden_weapon = False
@@ -282,7 +283,7 @@ class Player:
             elif self.has_forger_gun == 0:
                 return []
             elif len(victims) != 1:
-                self.chat.write_message("You can only shoot one person.")
+                self.chat.write_message("You can only shoot one person. Check the spelling.")
             elif not victims[0].alive:
                 self.chat.write_message("Your target is already dead.")
             elif victims[0].gamenum == self.gamenum:
@@ -347,7 +348,8 @@ class Bully(Player):
                     victims[0].has_been_concussed = True
                     return ['success']
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only rock one person per day.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only rock one person per day. "
+                                                                           "Check the spelling.")
             elif self.mp < 25:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You are out of rocks.")
             elif not victims[0].alive:
@@ -382,7 +384,7 @@ class Conjuror(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the day by posting [b]here[/b]:
 
         Wolfbot take (username)
@@ -394,22 +396,23 @@ class Conjuror(Player):
         # they haven't already taken a role today, and role hasn't been taken yet
         if keyword == 'take' and isinstance(chat_obj, tc.Chat):
             if (len(victims) == 1 and not victims[0].alive and victims[0].conjuror_can_take and self.alive
-                    and self.current_thread.open and not self.action_used and not self.concussed and
+                    and self.current_thread.open and not self.conjuror_acted and not self.concussed and
                     len(self.corrupted_by) == 0):
-                self.action_used = True
+                self.conjuror_acted = True
                 self.new_role = victims[0]
                 chat_obj.write_message(chat_obj.quote_message(messageid) +
                                        f"You have successfully taken {victims[0].screenname}'s role.")
                 return ['success']
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only take one role.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only take the role of one player. "
+                                                                           "Check the spelling.")
             elif victims[0].alive:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "Your target must be dead.")
             elif not self.current_thread.open:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only act during the day.")
             elif not self.alive:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You are dead.")
-            elif self.action_used:
+            elif self.conjuror_acted:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You have already acted today.")
             elif self.concussed:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You are concussed and cannot act.")
@@ -430,7 +433,7 @@ class Detective(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
         Wolfbot check (username) and (username)'''
@@ -511,7 +514,7 @@ class Gunner(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the day by posting [b]in the day thread[/b]:
 
         Wolfbot shoot (username)'''
@@ -527,7 +530,7 @@ class Gunner(Player):
                 self.mp = self.mp - 50
                 return ['gunner', self, victims[0]]
             elif len(victims) != 1:
-                self.chat.write_message("You can only shoot one person.")
+                self.chat.write_message("You can only shoot one person. Check the spelling.")
             elif self.mp < 50:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You are out of bullets.")
             elif not victims[0].alive:
@@ -560,7 +563,7 @@ class Jailer(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the day by posting [b]here[/b]:
 
         Wolfbot jail (username)
@@ -578,7 +581,8 @@ class Jailer(Player):
                 chat_obj.write_message(chat_obj.quote_message(messageid) +
                                        f"{victims[0].screenname} will be jailed tonight.")
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only jail one person.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only jail one person. "
+                                                                           "Check the spelling.")
             elif not victims[0].alive:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "Your target is dead.")
             elif victims[0].gamenum == self.gamenum:
@@ -597,7 +601,8 @@ class Jailer(Player):
                     and len(self.corrupted_by) == 0 and not self.nightmared):
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "Your prisoner will be shot tonight.")
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only shoot one person.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only shoot one person. "
+                                                                           "Check the spelling.")
             elif self.mp < 100:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You are out of bullets.")
             elif not victims[0].jailed:
@@ -650,7 +655,7 @@ class Medium(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
         Wolfbot revive (username).
@@ -666,7 +671,8 @@ class Medium(Player):
                 chat_obj.write_message(chat_obj.quote_message(messageid) +
                                        f"{victims[0].screenname} will be revived at the beginning of the day.")
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only revive one person.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only revive one person. "
+                                                                           "Check the spelling.")
             elif self.mp < 100:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You have already used your ability.")
             elif victims[0].alive:
@@ -714,7 +720,7 @@ class Ritualist(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the day or night by posting [b]here[/b]:
 
         Wolfbot spell (username)
@@ -732,7 +738,8 @@ class Ritualist(Player):
                 victims[0].spelled = True
                 return ['success']
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only spell one person.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only spell one person. "
+                                                                           "Check the spelling.")
             elif self.mp < 100:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You have already used your revive.")
             elif not victims[0].alive:
@@ -768,7 +775,7 @@ class Warden(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the day by posting [b]here[/b]:
 
         Wolfbot jail (username) and (username)
@@ -787,7 +794,7 @@ class Warden(Player):
                     and self.current_thread.open):
                 chat_obj.write_message(chat_obj.quote_message(messageid) +
                                        f"{victims[0].screenname} and {victims[1].screenname} will be jailed tonight.")
-            elif len(victims) != 2 or victims[0].gamenum != victims[1].gamenum:
+            elif len(victims) != 2 or victims[0].gamenum == victims[1].gamenum:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You must jail exactly two "
                                                                            "different people.")
             elif not are_all_alive(victims):
@@ -798,8 +805,6 @@ class Warden(Player):
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only act during the day.")
             elif not self.alive:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You are dead.")
-            elif self.action_used:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You have already thrown a rock today.")
             elif self.concussed:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You are concussed and cannot act.")
             elif len(self.corrupted_by) != 0:
@@ -823,7 +828,8 @@ class Warden(Player):
                 Do it in the jail chat with the person you are killing.''')
                 return ['success']
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only arm one person.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only arm one person. "
+                                                                           "Check the spelling.")
             elif self.mp < 100:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "Your weapon has already been used.")
             elif not victims[0].alive:
@@ -874,7 +880,7 @@ class AuraSeer(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
         Wolfbot check (username)'''
@@ -889,7 +895,8 @@ class AuraSeer(Player):
                                        f"{victims[0].screenname if self.night > 1 else victims[0].noun} "
                                        f"at the end of the night.")
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only check one person.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only check one person. "
+                                                                           "Check the spelling.")
             elif not victims[0].alive:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "Your target is dead.")
             elif victims[0].gamenum == self.gamenum:
@@ -937,7 +944,7 @@ class Avenger(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
         Wolfbot tag (username)'''
@@ -952,7 +959,8 @@ class Avenger(Player):
                 self.acting_upon = victims
                 return ["success"]
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only avenge upon one person.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only avenge upon one person. "
+                                                                           "Check the spelling.")
             elif not victims[0].alive:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "Your target is dead.")
             elif victims[0].gamenum == self.gamenum:
@@ -984,7 +992,7 @@ class BeastHunter(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
         Wolfbot trap (username)'''
@@ -998,7 +1006,8 @@ class BeastHunter(Player):
                                        f"Tonight you will move your trap to "
                                        f"{victims[0].screenname if self.night > 1 else victims[0].noun}.")
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only trap one person.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only trap one person. "
+                                                                           "Check the spelling.")
             elif not victims[0].alive:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "Your target is dead.")
             elif victims[0].gamenum == self.trap_on:
@@ -1041,7 +1050,7 @@ class BellRinger(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
         Wolfbot watch (username) and (username)'''
@@ -1105,7 +1114,7 @@ class Bodyguard(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
         Wolfbot protect (username)'''
@@ -1119,7 +1128,8 @@ class Bodyguard(Player):
                                        f"{victims[0].screenname if self.night > 1 else victims[0].noun}"
                                        f" tonight.")
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only protect one person.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only protect one person. "
+                                                                           "Check the spelling.")
             elif not victims[0].alive:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "Your target is dead.")
             elif self.current_thread.open:
@@ -1157,7 +1167,7 @@ class Defender(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
         Wolfbot protect (username) and (username) and (username) and (username) and (username) and (username)
@@ -1223,7 +1233,7 @@ class Doctor(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
         Wolfbot protect (username)'''
@@ -1237,7 +1247,8 @@ class Doctor(Player):
                         f"You will protect {victims[0].screenname if self.night > 1 else victims[0].noun} tonight.")
                 chat_obj.write_message(text)
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only protect one person.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only protect one person. "
+                                                                           "Check the spelling.")
             elif not victims[0].alive:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "Your target is dead.")
             elif victims[0].gamenum == self.gamenum:
@@ -1280,7 +1291,7 @@ class Farmer(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b].'''
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b].'''
 
 
 class Flagger(Player):
@@ -1296,7 +1307,7 @@ class Flagger(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
         Wolfbot redirect (username) to (username)'''
@@ -1315,7 +1326,7 @@ class Flagger(Player):
             elif len(victims) != 2:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You must chooose both one person to "
                                                                            "protect and one person to redirect the "
-                                                                           "attack to.")
+                                                                           "attack to. Check the spelling.")
             elif self.mp < 50:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You are out of redirects.")
             elif not are_all_alive(victims):
@@ -1367,7 +1378,7 @@ class FlowerChild(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the day by posting [b]here[/b]:
 
         Wolfbot protect (username)'''
@@ -1386,7 +1397,8 @@ class FlowerChild(Player):
                 self.acting_upon = victims
                 return ["success"]
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only protect one person.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only protect one person. "
+                                                                           "Check the spelling.")
             elif self.mp < 100:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You have already used your ability.")
             elif not victims[0].alive:
@@ -1416,7 +1428,7 @@ class Forger(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
         Wolfbot weapon
@@ -1495,7 +1507,8 @@ class Forger(Player):
                 text = chat_obj.quote_message(messageid) + f"You will give the shield to {victims[0].screenname}."
                 chat_obj.write_message(text)
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only arm one person.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only arm one person. "
+                                                                           "Check the spelling.")
             elif self not in self.forger_guns and self not in self.forger_shields:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You have nothing to give.")
             elif not victims[0].alive:
@@ -1590,7 +1603,7 @@ class Judge(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the day by posting [b]here[/b]:
 
         Wolfbot judge (username)'''
@@ -1604,7 +1617,8 @@ class Judge(Player):
                         f"You will judge {victims[0].screenname} today if the village cannot decide who to lynch.")
                 chat_obj.write_message(text)
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only judge one person.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only judge one person. "
+                                                                           "Check the spelling.")
             elif self.mp < 50:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You have used up your ability.")
             elif not victims[0].alive:
@@ -1651,7 +1665,7 @@ class Librarian(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
         Wolfbot mute (username)'''
@@ -1665,7 +1679,8 @@ class Librarian(Player):
                         f"You will mute {victims[0].screenname if self.night > 1 else victims[0].noun} tomorrow.")
                 chat_obj.write_message(text)
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only mute one person.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only mute one person. "
+                                                                           "Check the spelling.")
             elif not victims[0].alive:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "Your target is dead.")
             elif victims[0].gamenum == self.gamenum:
@@ -1710,7 +1725,7 @@ class Loudmouth(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the day or night by posting [b]here[/b]:
 
         Wolfbot reveal (username)'''
@@ -1725,7 +1740,8 @@ class Loudmouth(Player):
                 self.acting_upon = victims
                 return ["success"]
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only reveal one person.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only reveal one person. "
+                                                                           "Check the spelling.")
             elif not victims[0].alive:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "Your target is dead.")
             elif victims[0].gamenum == self.gamenum:
@@ -1758,7 +1774,7 @@ class Marksman(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
         Wolfbot mark (username)
@@ -1778,7 +1794,8 @@ class Marksman(Player):
                         f"You will mark {victims[0].screenname if self.night > 1 else victims[0].noun} tonight.")
                 chat_obj.write_message(text)
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only mark one person.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only mark one person. "
+                                                                           "Check the spelling.")
             elif self.mp < 50:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You are out of arrows.")
             elif not victims[0].alive:
@@ -1808,7 +1825,8 @@ class Marksman(Player):
                         f"You will shoot {victims[0].screenname if self.night > 1 else victims[0].noun} tonight.")
                 chat_obj.write_message(text)
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only mark one person.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only mark one person. "
+                                                                           "Check the spelling.")
             elif victims[0].gamenum != self.acting_upon[0].gamenum:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only shoot the person "
                                                                            "you have marked.")
@@ -1849,7 +1867,7 @@ class Marksman(Player):
                 and not self.concussed and len(self.corrupted_by) == 0 and not self.nightmared
                 and not self.jailed and self.alive):
             self.cooldown = True
-            self.acting_upon = victims[0]
+            self.acting_upon = victims
             text = chat_obj.quote_message(messageid) + f"{victims[0].screenname} is now marked."
             chat_obj.write_message(text)
             return ["success"]
@@ -1866,7 +1884,7 @@ class Preacher(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
         Wolfbot watch (username)'''
@@ -1880,7 +1898,8 @@ class Preacher(Player):
                         f"You will watch {victims[0].screenname if self.night > 1 else victims[0].noun} tonight.")
                 chat_obj.write_message(text)
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only watch one person.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only watch one person. "
+                                                                           "Check the spelling.")
             elif not victims[0].alive:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "Your target is dead.")
             elif victims[0].gamenum == self.gamenum:
@@ -1984,7 +2003,7 @@ class Priest(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the day by posting [b]in the day thread[/b]:
 
         Wolfbot water (username)'''
@@ -2002,7 +2021,8 @@ class Priest(Player):
                 else:
                     return ['drowned', victims[0], self]
             elif len(victims) != 1:
-                self.chat.write_message(self.chat.quote_message(messageid) + "You can only water one person.")
+                self.chat.write_message(self.chat.quote_message(messageid) + "You can only water one person. "
+                                                                             "Check the spelling.")
             elif self.mp < 100:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You are out of water.")
             elif not victims[0].alive:
@@ -2030,7 +2050,7 @@ class RedLady(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
         Wolfbot visit (username)'''
@@ -2044,7 +2064,8 @@ class RedLady(Player):
                         f"You will visit {victims[0].screenname if self.night > 1 else victims[0].noun} tonight.")
                 chat_obj.write_message(text)
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only visit one person.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only visit one person. "
+                                                                           "Check the spelling.")
             elif not victims[0].alive:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "Your target is dead.")
             elif victims[0].gamenum == self.gamenum:
@@ -2089,7 +2110,7 @@ class Sheriff(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
         Wolfbot watch (username)'''
@@ -2103,7 +2124,8 @@ class Sheriff(Player):
                         f"You will watch {victims[0].screenname if self.night > 1 else victims[0].noun} tonight.")
                 chat_obj.write_message(text)
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only watch one person.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only watch one person. "
+                                                                           "Check the spelling.")
             elif not victims[0].alive:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "Your target is dead.")
             elif victims[0].gamenum == self.gamenum:
@@ -2150,7 +2172,7 @@ class SeerApprentice(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b].'''
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b].'''
 
 
 class SpiritSeer(Player):
@@ -2164,7 +2186,7 @@ class SpiritSeer(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
         Wolfbot watch (username) and (username)
@@ -2189,7 +2211,8 @@ class SpiritSeer(Player):
                 chat_obj.write_message(chat_obj.quote_message(messageid) +
                                        f"You are checking {victims[0].screenname} at the end of the night.")
             elif len(victims) != 1 and len(victims) != 2:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only check one  or two people.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only check one or two people. "
+                                                                           "Check the spelling.")
             elif not are_all_alive(victims):
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "Your target is dead.")
             elif victims[0].gamenum == self.gamenum:
@@ -2272,7 +2295,7 @@ class ToughGuy(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
         Wolfbot protect (username)'''
@@ -2287,7 +2310,8 @@ class ToughGuy(Player):
                                        f"{victims[0].screenname if self.night > 1 else victims[0].noun}"
                                        f" tonight.")
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only protect one person.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only protect one person. "
+                                                                           "Check the spelling.")
             elif not victims[0].alive:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "Your target is dead.")
             elif victims[0].gamenum == self.gamenum:
@@ -2331,7 +2355,7 @@ class Violinist(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
         Wolfbot check (username)'''
@@ -2348,7 +2372,8 @@ class Violinist(Player):
                 chat_obj.write_message(chat_obj.quote_message(messageid) +
                                        f"Nobody has died since last night to compare with.")
             elif len(victims) != 2:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only check one person.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only check one person. "
+                                                                           "Check the spelling.")
             elif not victims[0].alive:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "Your target is dead.")
             elif victims[0].gamenum == self.gamenum:
@@ -2410,7 +2435,7 @@ class Witch(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
         Wolfbot protect (username)
@@ -2428,28 +2453,29 @@ class Witch(Player):
                     and len(self.corrupted_by) == 0 and not self.nightmared and not self.jailed):
                 chat_obj.write_message(chat_obj.quote_message(messageid) + f"You will attempt to protect "
                                        f"{victims[0].screenname if self.night > 1 else victims[0].noun} tonight")
-        elif len(victims) != 1:
-            chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only protect one person.")
-        elif not self.has_protect_potion:
-            chat_obj.write_message(chat_obj.quote_message(messageid) + "You are out of protect potions.")
-        elif not victims[0].alive:
-            chat_obj.write_message(chat_obj.quote_message(messageid) + "Your target is dead.")
-        elif victims[0].gamenum == self.gamenum:
-            chat_obj.write_message(chat_obj.quote_message(messageid) + "You can't target yourself.")
-        elif self.current_thread.open:
-            chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only act during the night.")
-        elif not self.alive:
-            chat_obj.write_message(chat_obj.quote_message(messageid) + "You are dead.")
-        elif self.concussed:
-            chat_obj.write_message(chat_obj.quote_message(messageid) + "You are concussed and cannot act.")
-        elif len(self.corrupted_by) != 0:
-            chat_obj.write_message(chat_obj.quote_message(messageid) + "You are corrupted and cannot act.")
-        elif self.nightmared:
-            chat_obj.write_message(chat_obj.quote_message(messageid) + "You are nightmared and cannot act.")
-        elif self.jailed:
-            chat_obj.write_message(chat_obj.quote_message(messageid) + f"You are jailed and cannot perform night "
-                                                                       f"actions. If you are somehow unjailed, "
-                                                                       f"this action will be performed")
+            elif len(victims) != 1:
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only protect one person. "
+                                                                           "Check the spelling.")
+            elif not self.has_protect_potion:
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You are out of protect potions.")
+            elif not victims[0].alive:
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "Your target is dead.")
+            elif victims[0].gamenum == self.gamenum:
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can't target yourself.")
+            elif self.current_thread.open:
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only act during the night.")
+            elif not self.alive:
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You are dead.")
+            elif self.concussed:
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You are concussed and cannot act.")
+            elif len(self.corrupted_by) != 0:
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You are corrupted and cannot act.")
+            elif self.nightmared:
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You are nightmared and cannot act.")
+            elif self.jailed:
+                chat_obj.write_message(chat_obj.quote_message(messageid) + f"You are jailed and cannot perform night "
+                                                                           f"actions. If you are somehow unjailed, "
+                                                                           f"this action will be performed")
         if keyword == 'poison' and isinstance(chat_obj, tc.Chat):
             if (len(victims) == 1 and victims[0].alive and victims[0].gamenum != self.gamenum
                     and self.has_kill_potion and not self.current_thread.open and self.alive and not self.concussed
@@ -2457,28 +2483,29 @@ class Witch(Player):
                 chat_obj.write_message(chat_obj.quote_message(messageid) +
                                        f"You will kill {victims[0].screenname if self.night > 1 else victims[0].noun}"
                                        f" tonight")
-        elif len(victims) != 1:
-            chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only poison one person.")
-        elif not self.has_kill_potion:
-            chat_obj.write_message(chat_obj.quote_message(messageid) + "You are out of rocks.")
-        elif not victims[0].alive:
-            chat_obj.write_message(chat_obj.quote_message(messageid) + "Your target is dead.")
-        elif victims[0].gamenum == self.gamenum:
-            chat_obj.write_message(chat_obj.quote_message(messageid) + "You can't target yourself.")
-        elif self.current_thread.open:
-            chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only act during the night.")
-        elif not self.alive:
-            chat_obj.write_message(chat_obj.quote_message(messageid) + "You are dead.")
-        elif self.concussed:
-            chat_obj.write_message(chat_obj.quote_message(messageid) + "You are concussed and cannot act.")
-        elif len(self.corrupted_by) != 0:
-            chat_obj.write_message(chat_obj.quote_message(messageid) + "You are corrupted and cannot act.")
-        elif self.nightmared:
-            chat_obj.write_message(chat_obj.quote_message(messageid) + "You are nightmared and cannot act.")
-        elif self.jailed:
-            chat_obj.write_message(chat_obj.quote_message(messageid) + f"You are jailed and cannot perform night "
-                                                                       f"actions. If you are somehow unjailed, "
-                                                                       f"this action will be performed")
+            elif len(victims) != 1:
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only poison one person. "
+                                                                           "Check the spelling.")
+            elif not self.has_kill_potion:
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You are out of rocks.")
+            elif not victims[0].alive:
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "Your target is dead.")
+            elif victims[0].gamenum == self.gamenum:
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can't target yourself.")
+            elif self.current_thread.open:
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only act during the night.")
+            elif not self.alive:
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You are dead.")
+            elif self.concussed:
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You are concussed and cannot act.")
+            elif len(self.corrupted_by) != 0:
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You are corrupted and cannot act.")
+            elif self.nightmared:
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You are nightmared and cannot act.")
+            elif self.jailed:
+                chat_obj.write_message(chat_obj.quote_message(messageid) + f"You are jailed and cannot perform night "
+                                                                           f"actions. If you are somehow unjailed, "
+                                                                           f"this action will be performed")
         return []
 
     def phased_action(self, messageid, keyword, victims, chat_obj):
@@ -2519,7 +2546,7 @@ class WolfAvenger(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the day or night by posting [b]here[/b]:
 
         Wolfbot tag (username)'''
@@ -2533,7 +2560,8 @@ class WolfAvenger(Player):
                 self.acting_upon = victims
                 return ['success']
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only tag one person.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only tag one person. "
+                                                                           "Check the spelling.")
             elif not victims[0].alive:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "Your target is dead.")
             elif not victims[0].wolf_targetable:
@@ -2572,7 +2600,7 @@ class Werewolf(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b].'''
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b].'''
 
 
 class ShamanWolf(Player):
@@ -2596,7 +2624,7 @@ class ShamanWolf(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time [b]during the day[/b] by posting [b]here[/b]:
 
         Wolfbot shaman (username)'''
@@ -2610,7 +2638,8 @@ class ShamanWolf(Player):
                                        f"{victims[0].screenname if self.night > 1 else victims[0].noun} "
                                        f"tonight.")
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only shaman one person.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only shaman one person. "
+                                                                           "Check the spelling.")
             elif not victims[0].alive:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "Your target is dead.")
             elif not victims[0].wolf_targetable:
@@ -2662,7 +2691,7 @@ class BerserkWolf(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the day or night by posting [b]here[/b]:
 
         Wolfbot berserk'''
@@ -2729,7 +2758,7 @@ class NightmareWolf(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the day by posting [b]here[/b]:
 
         Wolfbot nightmare (username)'''
@@ -2743,7 +2772,8 @@ class NightmareWolf(Player):
                 chat_obj.write_message(chat_obj.quote_message(messageid) +
                                        f"You will nightmare {victims[0].screenname} tonight.")
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only nightmare one person.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only nightmare one person. "
+                                                                           "Check the spelling.")
             elif self.mp < 50:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You are out of nightmares.")
             elif not victims[0].alive:
@@ -2799,7 +2829,7 @@ class VoodooWolf(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
         Wolfbot mute (username)'''
@@ -2813,7 +2843,8 @@ class VoodooWolf(Player):
                         f"You will mute {victims[0].screenname if self.night > 1 else victims[0].noun} tomorrow.")
                 chat_obj.write_message(text)
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only mute one person.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only mute one person. "
+                                                                           "Check the spelling.")
             elif not victims[0].alive:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "Your target is dead.")
             elif not victims[0].wolf_targetable:
@@ -2869,7 +2900,7 @@ class GuardianWolf(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the day by posting [b]here[/b]:
 
         Wolfbot protect (username)'''
@@ -2888,7 +2919,8 @@ class GuardianWolf(Player):
                 chat_obj.write_message(text)
                 return ['success']
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only protect one person.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only protect one person. "
+                                                                           "Check the spelling.")
             elif self.mp < 100:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You have already used your ability.")
             elif not victims[0].alive:
@@ -2929,7 +2961,7 @@ class WolfTrickster(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the day or night by posting [b]here[/b]:
 
         Wolfbot trick (username)'''
@@ -2948,7 +2980,8 @@ class WolfTrickster(Player):
                 self.acting_upon = victims
                 return ['success']
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only trick one person.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only trick one person. "
+                                                                           "Check the spelling.")
             elif self.mp < 100:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You have already used your ability.")
             elif not victims[0].alive:
@@ -2990,7 +3023,7 @@ class ConfusionWolf(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
         Wolfbot confusion'''
@@ -3057,7 +3090,7 @@ class ShadowWolf(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the day by posting [b]here[/b]:
 
         Wolfbot shadow'''
@@ -3116,7 +3149,7 @@ class JellyWolf(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
         Wolfbot protect (username)'''
@@ -3131,7 +3164,8 @@ class JellyWolf(Player):
                         f" tonight.")
                 chat_obj.write_message(text)
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only protect one person.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only protect one person. "
+                                                                           "Check the spelling.")
             elif self.mp < 100:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You are out of jelly.")
             elif not victims[0].alive:
@@ -3183,7 +3217,7 @@ class ToxicWolf(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the day by posting [b]here[/b]:
 
         Wolfbot poison (username)'''
@@ -3199,7 +3233,8 @@ class ToxicWolf(Player):
                                                                            f"been poisoned.")
                 return ['success']
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only poison one person.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only poison one person. "
+                                                                           "Check the spelling.")
             elif self.mp < 50:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You are out of rocks.")
             elif not victims[0].alive:
@@ -3242,7 +3277,7 @@ class WolfScribe(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time by posting [b]here[/b]:
 
         Wolfbot scribe (username) by (method) as (role)
@@ -3388,7 +3423,7 @@ class AlphaWolf(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b].'''
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b].'''
 
 
 class BlindWolf(Player):
@@ -3411,7 +3446,7 @@ class BlindWolf(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
         Wolfbot check (username) and (username)
@@ -3430,9 +3465,9 @@ class BlindWolf(Player):
                     and self.alive and len(self.corrupted_by) == 0 and not self.jailed):
                 chat_obj.write_message(chat_obj.quote_message(messageid) +
                                        f"{victims[0].screenname if self.night > 1 else victims[0].noun} "
-                                       f"is the {victims[0].category}. "
+                                       f"is a {victims[0].category}. "
                                        f"{victims[1].screenname if self.night > 1 else victims[1].noun} "
-                                       f"is the {victims[1].category}.")
+                                       f"is a {victims[1].category}.")
                 self.checked = 2
                 return [f'{victims[0].category}, {victims[1].category}']
             if (len(victims) == 1 and victims[0].alive and victims[0].wolf_targetable and self.checked < 2
@@ -3444,7 +3479,8 @@ class BlindWolf(Player):
                 self.checked = self.checked + 1
                 return [f'{victims[0].category}']
             elif len(victims) != 1 and len(victims) != 2:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only check one or two people.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only check one or two people. "
+                                                                           "Check the spelling.")
             elif not are_all_alive(victims):
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "One of your targets is dead.")
             elif not victims[0].wolf_targetable or not victims[1].wolf_targetable:
@@ -3492,7 +3528,7 @@ class WolfSeer(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
         Wolfbot check (username)
@@ -3512,7 +3548,8 @@ class WolfSeer(Player):
                 self.checked = self.checked + 1
                 return [f'{victims[0].role}']
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only check one person.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only check one person. "
+                                                                           "Check the spelling.")
             elif not victims[0].alive:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "Your target is dead.")
             elif not victims[0].wolf_targetable:
@@ -3559,7 +3596,7 @@ class Sorcerer(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
         Wolfbot check (username)
@@ -3583,7 +3620,8 @@ class Sorcerer(Player):
                 self.seen.append(victims[0])
                 return [f'{victims[0].role}']
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only check one person.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only check one person. "
+                                                                           "Check the spelling.")
             elif not victims[0].alive:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "Your target is dead.")
             elif not victims[0].wolf_targetable:
@@ -3611,7 +3649,8 @@ class Sorcerer(Player):
                 self.mp -= 50
                 return ['reveal', victims[0]]
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only reveal one person.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only reveal one person. "
+                                                                           "Check the spelling.")
             elif self.mp < 50:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You have used up your ability to reveal.")
             elif not victims[0].alive:
@@ -3656,7 +3695,7 @@ class WerewolfFan(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the day or night by posting [b]here[/b]:
 
         Wolfbot reveal (username)'''
@@ -3672,7 +3711,8 @@ class WerewolfFan(Player):
                                        f"at the start of the next night.")
                 return ['success']
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only reveal to one person.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only reveal to one person. "
+                                                                           "Check the spelling.")
             elif not victims[0].alive:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "Your target is dead.")
             elif victims[0].gamenum == self.gamenum:
@@ -3715,7 +3755,7 @@ class Cupid(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the first night by posting [b]here[/b]:
 
         Wolfbot couple (username) and (username)'''
@@ -3768,7 +3808,7 @@ class Fool(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b].'''
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b].'''
 
 
 class Headhunter(Player):
@@ -3788,7 +3828,7 @@ class Headhunter(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Your target is {self.target_name}. Good luck!'''
 
 
@@ -3811,7 +3851,7 @@ class Alchemist(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
         Wolfbot kill (username)
@@ -3833,7 +3873,7 @@ class Alchemist(Player):
                                        f"{victims[0].screenname if self.night > 1 else victims[0].noun} tonight.")
             elif len(victims) != 1:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only use one "
-                                                                           "potion per one person.")
+                                                                           "potion per one person. Check the spelling.")
             elif not victims[0].alive:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "Your target is dead.")
             elif victims[0].gamenum == self.gamenum:
@@ -3861,7 +3901,7 @@ class Alchemist(Player):
                                        f"{victims[0].screenname if self.night > 1 else victims[0].noun} tonight.")
             elif len(victims) != 1:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only use one "
-                                                                           "potion per one person.")
+                                                                           "potion per one person. Check the spelling.")
             elif not victims[0].alive:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "Your target is dead.")
             elif victims[0].gamenum == self.gamenum:
@@ -3919,7 +3959,7 @@ class Arsonist(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
         Wolfbot douse (username) and (username)
@@ -3966,7 +4006,8 @@ class Arsonist(Player):
                                        f"{victims[0].screenname if self.night > 1 else victims[0].noun} "
                                        f"tonight.")
             elif len(victims) != 1 and len(victims) != 2:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only douse one or two people.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only douse one or two people. "
+                                                                           "Check the spelling.")
             elif not are_all_alive(victims):
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "One of your targets is dead.")
             elif victims[0].gamenum == self.gamenum or self.gamenum != victims[1].gamenum:
@@ -4040,7 +4081,7 @@ class Corruptor(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
         Wolfbot corrupt (username)'''
@@ -4055,7 +4096,8 @@ class Corruptor(Player):
                                        f"{victims[0].screenname if self.night > 1 else victims[0].noun}"
                                        f" tonight.")
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only attack one person.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only attack one person. "
+                                                                           "Check the spelling.")
             elif not victims[0].alive:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "Your target is dead.")
             elif victims[0].gamenum == self.gamenum:
@@ -4096,7 +4138,7 @@ class CultLeader(Player):
         self.conjuror_can_take = False
         self.is_killer = True
         self.gamenum = gamenum
-        self.noun = self.noun
+        self.noun = noun
         self.aura = 'Unknown'
         self.hhtargetable = False
         self.sacrifice_selected = False
@@ -4106,7 +4148,7 @@ class CultLeader(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
         Wolfbot convert (username)
@@ -4131,7 +4173,8 @@ class CultLeader(Player):
                                        f"{victims[0].screenname if self.night > 1 else victims[0].noun} "
                                        f"to the cult tonight.")
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only convert one person.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only convert one person. "
+                                                                           "Check the spelling.")
             elif not victims[0].alive:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "Your target is dead.")
             elif victims[0].gamenum == self.gamenum:
@@ -4158,7 +4201,8 @@ class CultLeader(Player):
                 chat_obj.write_message(chat_obj.quote_message(messageid) +
                                        f"You will sacrifice {victims[0].screenname} tonight.")
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only convert one person.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only convert one person. "
+                                                                           "Check the spelling.")
             elif not victims[0].cult:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You can sacrifice a cult member.")
             elif not victims[0].alive:
@@ -4186,7 +4230,8 @@ class CultLeader(Player):
                 chat_obj.write_message(chat_obj.quote_message(messageid) +
                                        f"You are using your sacrifice to kill {victims[0].screenname} tonight.")
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only convert one person.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only convert one person. "
+                                                                           "Check the spelling.")
             elif victims[0].cult:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You can't attack a cult member, "
                                                                            "sacrifice them instead.")
@@ -4254,7 +4299,7 @@ class EvilDetective(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
         Wolfbot check (username) and (username)'''
@@ -4337,7 +4382,7 @@ class Illusionist(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
         Wolfbot disguise (username)
@@ -4367,7 +4412,8 @@ class Illusionist(Player):
                                        f"{victims[0].screenname if self.night > 1 else victims[0].noun}"
                                        f" tonight.")
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only disguise one person.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only disguise one person. "
+                                                                           "Check the spelling.")
             elif not victims[0].alive:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "Your target is dead.")
             elif victims[0].gamenum == self.gamenum:
@@ -4421,7 +4467,7 @@ class Infector(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
         Wolfbot infect (username)'''
@@ -4435,7 +4481,8 @@ class Infector(Player):
                                        f"You will infect {victims[0].screenname if self.night > 1 else victims[0].noun}"
                                        f" tonight.")
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only attack one person.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only attack one person. "
+                                                                           "Check the spelling.")
             elif not victims[0].alive:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "Your target is dead.")
             elif victims[0].gamenum == self.gamenum:
@@ -4486,7 +4533,7 @@ class Instigator(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night if you are by yourself by posting [b]here[/b]:
 
         Wolfbot kill (username)'''
@@ -4503,7 +4550,8 @@ class Instigator(Player):
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only kill people if the "
                                                                            "Instigator team has died.")
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only attack one person.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only attack one person. "
+                                                                           "Check the spelling.")
             elif not victims[0].alive:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "Your target is dead.")
             elif victims[0].gamenum == self.gamenum:
@@ -4552,7 +4600,7 @@ class SerialKiller(Player):
         self.apparent_role = self.role
         self.apparent_team = self.team
         self.apparent_aura = self.aura
-        self.initial_PM = f'''Your word is [b]{noun}[/b]. You are the [b]{self.role}[/b]. 
+        self.initial_PM = f'''Your word is [b]{self.noun}[/b]. You are the [b]{self.role}[/b]. 
         Use your ability at any time during the night by posting [b]here[/b]:
 
         Wolfbot kill (username) and (username) and (username)
