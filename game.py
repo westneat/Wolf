@@ -381,6 +381,7 @@ class Game:
             else:
                 all_alive = False
                 tag_list = tag_list + '[s]@' + i + '[/s]' + '\n'
+        text0 = "[b]Today's voting has been manipulated by the Shadow Wolf.[/b]\n\n" if self.shadow_in_effect else ''
         text1 = f'''The day will start at [TIME=datetime]{self.night_close_tm.strftime('%Y-%m-%dT%H:%M:%S-0500')}[/TIME]
         
         Dictionary: https://gwforums.com/threads/zell-wolf-role-dictionary-and-hall-of-fame.427/
@@ -489,7 +490,7 @@ class Game:
         
         In the event that two of the same role perform the exact same action, they will both be credited.
         
-        Winning Conditions:'''
+        Winning Conditions:\n'''
 
         text6 = (f"{'[s]' if self.rsv + self.rrv == 0 else ''}Village: Kill {'[s]' if self.rww == 0 else ''}"
                  f"all wolves {'[s]' if self.rk == 0 else ''}and {'[/s]' if self.rww == 0 else ''}"
@@ -506,7 +507,7 @@ class Game:
                  f"and 3 villagers, the Fool wins only).{'[/s]' if self.rv == 0 else ''}\n")
 
         text7 = self.actions if not all_alive else ''
-        return text1 + text2 + text3 + text4 + text5 + text6 + text7
+        return text0 + text1 + text2 + text3 + text4 + text5 + text6 + text7
 
     # can be chat or thread pieces passed in
     def get_keyword_phrases(self, pieces, dedupe=True, new=False):
@@ -613,7 +614,7 @@ class Game:
                 post_ids.append(pot_votes[0][i])  # returns post_id
                 posters.append(pot_votes[1][i])  # returns poster_id as role obj
                 votes.append(pot_votes[3][i][0])  # returns who voted for as role obj
-            elif len(pot_votes[3][i]) == 0:
+            elif pot_votes[2][i] == "VOTE" and len(pot_votes[3][i]) == 0:
                 self.wolf_chat.write_message(self.wolf_chat.quote_message(pot_votes[0][i]) +
                                              f"This is not a valid vote for a current player.")
         for i in range(len(votes)):
@@ -683,6 +684,11 @@ class Game:
     # Need to be a new role, but keep attributes that keep you "you"
     def role_swap(self, old_role, new_role):
         # save old attributes we want to carry over
+        if old_role.role != new_role.role:
+            old_role.chat.write_message(f"Your role has changed! Here are some things you may like to know:\n\n"
+                                        f"{new_role.initial_PM}")
+        if old_role.role == 'Conjuror':
+            self.saved_conjuror_data = copy.deepcopy(old_role)
         acting_upon = old_role.acting_upon
         action_used = old_role.action_used
         conjuror_acted = old_role.conjuror_acted
@@ -1094,8 +1100,10 @@ class Game:
                         if player not in final_victims:
                             solo_killer.chat.write_message(f"Your target ({player.screenname}) could not be attacked.")
 
-    def wolf_attack(self):
+    def wolf_attack(self, wolf_votes):
         votes = self.count_wolf_votes()
+        if len(votes) == 0:
+            votes = wolf_votes
         if len(votes) == 0:
             return
         berserk = False
@@ -1313,9 +1321,9 @@ class Game:
         self.output_data()
 
     def end_night(self):
+        saved_votes = self.count_wolf_votes()  # Do this just in case a new wolf chat is created prior to wolf attack
         pieces = self.multiple_conv_pieces()
         chat_items = self.get_keyword_phrases(pieces, dedupe=True)
-        self.new_thread_text = ''
 
         # Nightmare, Shaman, WWFan, Jailing all take place at start of night (Phase 0)
         # PHASE 1
@@ -1383,7 +1391,7 @@ class Game:
         self.phased_actions(['Berserk Wolf'], chat_items)
 
         # Phase 12
-        self.wolf_attack()
+        self.wolf_attack(saved_votes)
 
         # Phase 13
         self.phased_actions(['Spirit Seer'], chat_items)
@@ -1541,6 +1549,9 @@ class Game:
                 self.spell_count += 1
             if player.role == 'Ritualist' and self.spell_count > 1:
                 player.mp = 0
+            if player.role == 'Alchemist':
+                player.chat.write_message(f"Your potions are set to hit at [TIME=datetime]"
+                                          f"{self.alch_deaths_tm.strftime('%Y-%m-%dT%H:%M:%S-0500')}[/TIME]")
             # BH/Marksman has finished their ability cooldown
             if player.role in ['Marksman', 'Beast Hunter']:
                 player.cooldown = False
@@ -1608,6 +1619,8 @@ class Game:
             for i in self.role_dictionary:
                 player = self.role_dictionary[i]
                 if player.alive:
+                    if player.can_jail:  # Necessary for Conjuror
+                        self.jailer = player
                     pieces = player.chat.convo_pieces()
                     chat = [player.chat for _ in range(len(pieces[0]))]
                     pieces.append(chat)
@@ -1789,6 +1802,10 @@ class Game:
         skip_post = 0
         skip_private = []
         skip_chats = []
+        for i, player in enumerate(posters):
+            if player.conjuror and actions[i].lower() == 'take' and not player.conjuror_acted:
+                self.role_swap(player, self.saved_conjuror_data)
+                posters[i] = self.role_dictionary[player.gamenumalche]
         # Apply actions
         for i, player in enumerate(posters):
             if player.alive:
@@ -1820,6 +1837,9 @@ class Game:
                 elif (outcome[0] == 'shadow' and datetime.datetime.now() < self.day_close_tm -
                         datetime.timedelta(hours=12)):
                     self.shadow_in_effect = True
+                    self.day_thread.delete_poll()
+                    self.day_thread.write_message("[b]Today's voting has been manipulated by the Shadow Wolf.[/b]")
+                    self.day_thread.edit_post(self.first_post, self.day_post())
                     self.log['Phase'].append(f"Day {self.night - 1}")
                     self.log['Player'].append(player.screenname)
                     self.log['Action'].append("shadow")
@@ -1986,7 +2006,7 @@ class Game:
                         pieces.append(chats)
                         [_, _, actions, _, _, _] = self.get_keyword_phrases(pieces)
                         for action in actions:
-                            if action == 'kill' and self.jailed[i].given_warden_weapon:
+                            if action.lower() == 'kill' and self.jailed[i].given_warden_weapon:
                                 survivor = role.Player()
                                 self.jailer.mp = 0
                                 if self.jailed[i].role == 'Werewolf Fan':
@@ -2021,7 +2041,7 @@ class Game:
                                 self.jailed[1].jailed = False
                                 self.jailer_chat.write_message("Chat is Closed. "
                                                                "One of the prisoners has used the weapon.")
-                                self.jailee_chat.write_message(f"Chat is Closed.{survivor.screenname} has survived "
+                                self.jailee_chat.write_message(f"Chat is Closed. {survivor.screenname} has survived "
                                                                f"and is free from jailing restrictions to perform "
                                                                f"night actions as usual.")
                                 self.jailee_chat.close_chat()
@@ -2029,7 +2049,7 @@ class Game:
                                 self.jailed = []
                                 action_taken = True
                                 break
-                            if (action == 'escape' and self.jailed[0].category == 'Werewolf'
+                            if (action.lower() == 'escape' and self.jailed[0].category == 'Werewolf'
                                     and self.jailed[0].role != 'Sorcerer'
                                     and self.jailed[1].category == 'Werewolf'
                                     and self.jailed[1].role != 'Sorcerer'):
@@ -2586,6 +2606,7 @@ class Game:
             self.new_thread_text = self.new_thread_text + "\n\n[b]The game is over[/b]. The Fool has won!"
             self.game_over = True
             self.day_thread.write_message(self.new_thread_text)
+            self.new_thread_text = ''
             if not self.day_thread.open:
                 self.day_thread.unlock_thread()
             return True
@@ -2594,6 +2615,7 @@ class Game:
             self.new_thread_text = self.new_thread_text + "\n\n[b]The game is over[/b]. The Headhunter has won!"
             self.game_over = True
             self.day_thread.write_message(self.new_thread_text)
+            self.new_thread_text = ''
             if not self.day_thread.open:
                 self.day_thread.unlock_thread()
             return True
@@ -2602,6 +2624,7 @@ class Game:
             self.new_thread_text = self.new_thread_text + "\n\n[b]The game is over[/b]. It's a tie!"
             self.game_over = True
             self.day_thread.write_message(self.new_thread_text)
+            self.new_thread_text = ''
             if not self.day_thread.open:
                 self.day_thread.unlock_thread()
             return True
@@ -2610,6 +2633,7 @@ class Game:
             self.new_thread_text = self.new_thread_text + "\n\n[b]The game is over[/b]. The Lovers have won!"
             self.game_over = True
             self.day_thread.write_message(self.new_thread_text)
+            self.new_thread_text = ''
             if not self.day_thread.open:
                 self.day_thread.unlock_thread()
             return True
@@ -2618,6 +2642,7 @@ class Game:
             self.new_thread_text = self.new_thread_text + "\n\n[b]The game is over[/b]. The Instigator team has won!"
             self.game_over = True
             self.day_thread.write_message(self.new_thread_text)
+            self.new_thread_text = ''
             if not self.day_thread.open:
                 self.day_thread.unlock_thread()
             return True
@@ -2630,6 +2655,7 @@ class Game:
                                                                    f"The {player.role} has won!")
                     self.game_over = True
                     self.day_thread.write_message(self.new_thread_text)
+                    self.new_thread_text = ''
                     if not self.day_thread.open:
                         self.day_thread.unlock_thread()
                     return True
@@ -2638,6 +2664,7 @@ class Game:
             self.new_thread_text = self.new_thread_text + f"\n\n[b]The game is over[/b]. The Wolves have won!"
             self.game_over = True
             self.day_thread.write_message(self.new_thread_text)
+            self.new_thread_text = ''
             if not self.day_thread.open:
                 self.day_thread.unlock_thread()
             return True
@@ -2646,6 +2673,7 @@ class Game:
             self.new_thread_text = self.new_thread_text + f"\n\n[b]The game is over[/b]. The Village has won!"
             self.game_over = True
             self.day_thread.write_message(self.new_thread_text)
+            self.new_thread_text = ''
             if not self.day_thread.open:
                 self.day_thread.unlock_thread()
             return True
@@ -2654,6 +2682,7 @@ class Game:
             self.new_thread_text = self.new_thread_text + f"\n\n[b]The game is over[/b]. Everyone is dead. It's a tie!"
             self.game_over = True
             self.day_thread.write_message(self.new_thread_text)
+            self.new_thread_text = ''
             if not self.day_thread.open:
                 self.day_thread.unlock_thread()
             return True
@@ -2675,7 +2704,7 @@ class Game:
         # output game attributes to a text file
         f = open(f"{output_dir + self.game_title}.txt", 'w')
         for attribute in self.__dict__:
-            if attribute != 'master_data':
+            if attribute not in ['master_data', 'saved_conjuror_data']:
                 f.write(attribute + ": " + export(self.__dict__[attribute]) + '\n')
         f.close()
         # output each player's attributes to individual text files

@@ -340,16 +340,7 @@ class Thread:
             }
         requests.post(api_url, headers=self.headers, data=payload)
 
-    @tenacity.retry(**_RETRY_ARGS)
-    def post_shadow(self):
-        api_url = f'https://gwforums.com/api/threads/f{self.thread_id}/posts'
-        response = requests.post(api_url, headers=self.headers)
-        message = json.loads(response.text)['posts'][0]['message']
-        postid = json.loads(response.text)['posts'][0]['post_id']
-        newmessage = r"[b]The Shadow Wolf has manipulated today's voting.[/b]"+'\n\n'
-        self.edit_post(postid, newmessage+message)
-
-        # [QUOTE="Zell 17, post: 197915, member: 45"] [/QUOTE]
+    # [QUOTE="Zell 17, post: 197915, member: 45"] [/QUOTE]
 
     @tenacity.retry(**_RETRY_ARGS)
     def quote_message(self, postid):

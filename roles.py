@@ -245,7 +245,7 @@ class Player:
         if keyword == 'vote' and isinstance(chat_obj, tc.Chat):
             if not end:
                 if (len(voted) == 1 and voted[0].alive and self.current_thread.open and len(self.corrupted_by) == 0
-                        and voted[0].gamenum == self.gamenum and not self.concussed
+                        and voted[0].gamenum != self.gamenum and not self.concussed
                         and len(self.muted_by[self.night-1]) == 0):
                     self.chat.write_message(self.chat.quote_message(messageid) + f"You are voting for "
                                                                                  f"{voted[0].screenname}.")
@@ -265,7 +265,7 @@ class Player:
                     self.chat.write_message("You are muted and cannot vote.")
             else:
                 if (len(voted) == 1 and voted[0].alive and self.current_thread.open and len(self.corrupted_by) == 0
-                        and voted[0].gamenum == self.gamenum and not self.concussed
+                        and voted[0].gamenum != self.gamenum and not self.concussed
                         and len(self.muted_by[self.night - 1]) == 0):
                     if self.category == 'Werewolf' and self.role != 'Sorcerer':
                         return [voted[0], voted[0]]
@@ -402,12 +402,15 @@ class Conjuror(Player):
                 self.new_role = victims[0]
                 chat_obj.write_message(chat_obj.quote_message(messageid) +
                                        f"You have successfully taken {victims[0].screenname}'s role.")
+                victims[0].conjuror_can_take = False
                 return ['success']
             elif len(victims) != 1:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only take the role of one player. "
                                                                            "Check the spelling.")
             elif victims[0].alive:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "Your target must be dead.")
+            elif not victims[0].conjuror_can_take:
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You cannot take this person's role.")
             elif not self.current_thread.open:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only act during the day.")
             elif not self.alive:
@@ -1970,6 +1973,8 @@ class Preacher(Player):
                     text = (chat_obj.quote_message(messageid) +
                             f"Your vote{'s are' if len(voted) > 1 else ' is'} for: \n" + names)
                     chat_obj.write_message(text)
+                elif len(voted) == 0:
+                    self.chat.write_message("This is not a valid vote.")
                 elif len(voted) > self.votes:
                     self.chat.write_message("You are voting more people than you have votes.")
                 elif not are_all_alive(voted):
@@ -3101,10 +3106,7 @@ class ShadowWolf(Player):
                     and len(self.corrupted_by) == 0 and not self.jailed):
                 text = chat_obj.quote_message(messageid) + r"Shadow has been activated."
                 self.mp = self.mp - 100
-                self.current_thread.delete_poll()
-                self.current_thread.write_message("[b]Today's voting has been manipulated by the Shadow Wolf.[/b]")
                 self.shadow = False
-                self.current_thread.post_shadow()
                 if len(victims) == 1:
                     text = text + (f" You will need to vote {victims[0].screenname} "
                                    f"in the normal wolf vote. Reminder that Wolf Chat is closed.")
@@ -3767,7 +3769,7 @@ class Cupid(Player):
                 chat_obj.write_message(chat_obj.quote_message(messageid) +
                                        f"You will attempt to couple {victims[0].screenname} "
                                        f"and {victims[1].screenname}.")
-            elif len(victims) != 2 or victims[1].gamenum != victims[0].gamenum:
+            elif len(victims) != 2 or victims[1].gamenum == victims[0].gamenum:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You must only couple two different people.")
             elif victims[0].gamenum == self.gamenum or victims[1].gamenum == self.gamenum:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You can't target yourself.")

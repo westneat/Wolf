@@ -19,16 +19,16 @@ while not wolf.game_over:
     while datetime.datetime.now() < wolf.night_close_tm:
         if wolf.game_over:
             break
-        print("Running nightly check")
-        wolf.run_night_checks()
-        print("Completed")
         if datetime.datetime.now() < wolf.night_close_tm - datetime.timedelta(minutes=5):
+            print("Running nightly check")
+            wolf.run_night_checks()
+            print("Completed")
             time.sleep(300)
         if (wolf.night != 1 and datetime.datetime.now() > wolf.night_close_tm - datetime.timedelta(hours=1)
                 and not new_thread):
             new_thread = True
             wolf.day_thread.gameover()
-            wolf.day_thread.create_thread(f"{wolf.game_title} Day {wolf.night}", wolf.day_post())
+            wolf.first_post = wolf.day_thread.create_thread(f"{wolf.game_title} Day {wolf.night}", wolf.day_post())
             wolf.day_thread.stick_thread()
             wolf.day_thread.lock_thread()
         elif wolf.night == 1:
@@ -39,7 +39,7 @@ while not wolf.game_over:
     if not new_thread:
         new_thread = True
         wolf.day_thread.gameover()
-        wolf.day_thread.create_thread(f"{wolf.game_title} Day {wolf.night}", wolf.day_post())
+        wolf.first_post = wolf.day_thread.create_thread(f"{wolf.game_title} Day {wolf.night}", wolf.day_post())
         wolf.day_thread.stick_thread()
         wolf.day_thread.lock_thread()
     if wolf.game_over:
@@ -51,10 +51,10 @@ while not wolf.game_over:
     while datetime.datetime.now() < wolf.day_close_tm:
         if wolf.game_over:
             break
-        print("Running daily check")
-        wolf.run_day_checks()
-        print("Completed")
         if datetime.datetime.now() < wolf.day_close_tm - datetime.timedelta(minutes=5):
+            print("Running daily check")
+            wolf.run_day_checks()
+            print("Completed")
             time.sleep(300)
     if wolf.game_over:
         break
