@@ -1814,7 +1814,7 @@ class Game:
         for i, player in enumerate(posters):
             if player.conjuror and actions[i].lower() == 'take' and not player.conjuror_acted:
                 self.role_swap(player, self.saved_conjuror_data)
-                posters[i] = self.role_dictionary[player.gamenumalche]
+                posters[i] = self.role_dictionary[player.gamenum]
         # Apply actions
         for i, player in enumerate(posters):
             if player.alive:
