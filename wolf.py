@@ -8,11 +8,9 @@ wolf.assign_player_numbers()
 wolf.assign_roles()
 
 # wolf.resume("Wolfbot UAT")
-flag = False
+
 while not wolf.game_over:
-    if flag:
-        wolf.start_night()
-    flag = True
+    wolf.start_night()
     if wolf.game_over:
         break
     new_thread = False

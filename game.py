@@ -134,6 +134,7 @@ class Game:
         self.first_post = 0
         self.actions = '[table][tr][th]Phase[/th][th]Player[/th][th]Cause of Death[/th][th]Role[/th][/tr][/table]'
         self.log = {'Phase': [], 'Player': [], 'Action': [], 'Result': []}
+        self.witch_protect = False
 
     def add_action(self, player, method, revealed_role):
         self.actions = self.actions[:self.actions.find("[/table]")]
@@ -995,7 +996,7 @@ class Game:
                 final_victims.append(attacked)
         return final_victims
 
-    def phased_actions(self, rolelist, chat_items):
+    def phased_actions(self, rolelist, chat_items, attempt=1):
         [postids, posters, actions, victims, times, chats] = \
             [chat_items[0], chat_items[1], chat_items[2], chat_items[3], chat_items[4], chat_items[5]]
         for i in range(len(postids)):
@@ -1003,7 +1004,14 @@ class Game:
                 if not posters[i].jailed and not posters[i].concussed and not posters[i].nightmared:
                     if posters[i].role == 'Violinist':
                         victims[i].append(self.first_death)
-                    outcome = posters[i].phased_action(postids[i], actions[i].lower(), victims[i], chats[i])
+                    if posters[i].role == 'Witch' and actions[i].lower() == 'protect' and attempt == 1:
+                        outcome = posters[i].phased_action(postids[i], actions[i].lower(), victims[i], chats[i])
+                    elif posters[i].role == 'Witch' and attempt == 2:
+                        outcome = posters[i].phased_action(postids[i], actions[i].lower(), victims[i], chats[i])
+                    elif posters[i].role != 'Witch':
+                        outcome = posters[i].phased_action(postids[i], actions[i].lower(), victims[i], chats[i])
+                    else:
+                        outcome = []
                     if len(outcome) == 3:
                         self.secondary_text = ''
                         self.new_thread_text = self.new_thread_text + self.kill_player(outcome[0],
@@ -1370,7 +1378,7 @@ class Game:
             return
 
         # PHASE 8
-        self.phased_actions(['Witch'], chat_items)
+        self.phased_actions(['Witch'], chat_items, 2)
         if self.win_conditions():
             return
 
@@ -1549,7 +1557,7 @@ class Game:
                 self.spell_count += 1
             if player.role == 'Ritualist' and self.spell_count > 1:
                 player.mp = 0
-            if player.role == 'Alchemist':
+            if player.role == 'Alchemist' and player.alive:
                 player.chat.write_message(f"Your potions are set to hit at [TIME=datetime]"
                                           f"{self.alch_deaths_tm.strftime('%Y-%m-%dT%H:%M:%S-0500')}[/TIME]")
             # BH/Marksman has finished their ability cooldown
@@ -1619,8 +1627,6 @@ class Game:
             for i in self.role_dictionary:
                 player = self.role_dictionary[i]
                 if player.alive:
-                    if player.can_jail:  # Necessary for Conjuror
-                        self.jailer = player
                     pieces = player.chat.convo_pieces()
                     chat = [player.chat for _ in range(len(pieces[0]))]
                     pieces.append(chat)
@@ -1630,14 +1636,14 @@ class Game:
                             outcome = player.get_shadow_vote(postids[j], 'vote', victims[j], chats[j], True)
                             phase = f"Day {self.night - 1}" if self.day_thread.open else f'Night {self.night}'
                             self.log['Phase'].append(phase)
-                            self.log['Player'].append(posters[i].screenname)
+                            self.log['Player'].append(posters[j].screenname)
                             text = ''
-                            for k, victim in enumerate(victims[i]):
-                                if k == len(victims[i]) - 1:
+                            for k, victim in enumerate(victims[j]):
+                                if k == len(victims[j]) - 1:
                                     text = text + victim.screenname
                                 else:
                                     text = text + victim.screenname + ', '
-                            self.log['Action'].append(actions[i].lower() + " " + text)
+                            self.log['Action'].append(actions[j].lower() + " " + text)
                             self.log['Result'].append("success")
                         else:
                             outcome = []
@@ -1653,10 +1659,13 @@ class Game:
                     votecount.append(1)
             poll_results = {'Name': names, 'Vote Count': votecount}
         pandas_structure = pd.DataFrame.from_dict(poll_results)
+        pandas_structure = pandas_structure.groupby('Name').sum().reset_index()
         pandas_structure = pandas_structure[pandas_structure['Name'] != 'No Vote']
         alives = 0
         for i in self.role_dictionary:
             if self.role_dictionary[i].alive:
+                if self.role_dictionary[i].can_jail:  # Necessary for Conjuror
+                    self.jailer = self.role_dictionary[i]
                 alives += 1
         lynch_threshold = alives // 2
         top_vote = pandas_structure['Vote Count'].max()
