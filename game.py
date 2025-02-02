@@ -686,8 +686,11 @@ class Game:
     def role_swap(self, old_role, new_role):
         # save old attributes we want to carry over
         if old_role.role != new_role.role:
-            old_role.chat.write_message(f"Your role has changed! Here are some things you may like to know:\n\n"
-                                        f"{new_role.initial_PM}")
+            if new_role.role == 'Conjuror':
+                old_role.chat.write_message(f"Your role has changed! You have reverted to Conjuror.")
+            else:
+                old_role.chat.write_message(f"Your role has changed! Here are some things you may like to know:\n\n"
+                                            f"{new_role.initial_PM}")
         if old_role.role == 'Conjuror':
             self.saved_conjuror_data = copy.deepcopy(old_role)
         acting_upon = old_role.acting_upon
@@ -1778,9 +1781,12 @@ class Game:
                 for i, message in enumerate(posts):
                     if reacts[i] is False:
                         cultee.chat.write_message("From the Cult Leader: " + message)
+        self.to_skip = []
         # Go through each player chat and get any actions
         for i in self.role_dictionary:
             player = self.role_dictionary[i]
+            if player.alive and not player.skipped:
+                self.to_skip.append(player)
             chat_pieces = player.chat.convo_pieces()
             chat = [player.chat for _ in range(len(chat_pieces[0]))]
             chat_pieces.append(chat)
@@ -1941,8 +1947,11 @@ class Game:
 
     def run_night_checks(self):
         self.rebuild_dict()
+        self.to_skip = []
         for i in self.role_dictionary:
             player = self.role_dictionary[i]
+            if player.alive and not player.skipped:
+                self.to_skip.append(player)
             if player.is_last_evil and not player.resigned:
                 player.immediate_action('', 'resign', [], player.chat)
                 self.log['Phase'].append(f"Night {self.night}")

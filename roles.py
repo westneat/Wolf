@@ -3929,14 +3929,14 @@ class Alchemist(Player):
                 and self.gamenum != victims[0].gamenum and not self.current_thread.open and self.alive
                 and not self.concussed and len(self.corrupted_by) == 0 and not self.nightmared and not self.jailed):
             victims[0].black_potion = True
-            victims[0].chat.write_message("You've received a potion! "
+            victims[0].chat.write_message("[IMG]https://ptpimg.me/03t57j.png[/IMG]You've received a potion! "
                                           "You can't tell what color it is...you might die today.")
             return ['success']
         if (keyword == 'potion' and isinstance(chat_obj, tc.Chat) and len(victims) == 1 and victims[0].alive
                 and self.gamenum != victims[0].gamenum and not self.current_thread.open and self.alive
                 and not self.concussed and len(self.corrupted_by) == 0 and not self.nightmared and not self.jailed):
             victims[0].red_potion = victims[0].red_potion + 1
-            victims[0].chat.write_message("You've received a potion! "
+            victims[0].chat.write_message("[IMG]https://ptpimg.me/03t57j.png[/IMG]You've received a potion! "
                                           "You can't tell what color it is...you might die today.")
             return ['success']
         return []
