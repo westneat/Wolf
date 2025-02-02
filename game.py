@@ -1736,7 +1736,8 @@ class Game:
                     text = text + self.kill_player('alchemist', role.Player(), player)
                 if player.red_potion > 1:
                     text = text + self.kill_player('alchemist', role.Player(), player)
-            self.day_thread.write_message(text)
+            if text != '':
+                self.day_thread.write_message(text)
         if self.shadow_in_effect:
             for i in self.role_dictionary:
                 player = self.role_dictionary[i]
