@@ -695,6 +695,7 @@ class Game:
             self.saved_conjuror_data = copy.deepcopy(old_role)
         acting_upon = old_role.acting_upon
         action_used = old_role.action_used
+        skipped = old_role.skipped
         conjuror_acted = old_role.conjuror_acted
         alive = old_role.alive
         attacking = old_role.attacking
@@ -772,6 +773,7 @@ class Game:
         self.role_dictionary[gamenum].can_jail = can_jail
         self.role_dictionary[gamenum].category = category
         self.role_dictionary[gamenum].chat = chat
+        self.role_dictionary[gamenum].skipped = skipped
         self.role_dictionary[gamenum].concussed = concussed
         self.role_dictionary[gamenum].conjuror = conjuror
         self.role_dictionary[gamenum].corrupted_by = corrupted_by
@@ -1786,8 +1788,6 @@ class Game:
         # Go through each player chat and get any actions
         for i in self.role_dictionary:
             player = self.role_dictionary[i]
-            if player.alive and not player.skipped:
-                self.to_skip.append(player)
             chat_pieces = player.chat.convo_pieces()
             chat = [player.chat for _ in range(len(chat_pieces[0]))]
             chat_pieces.append(chat)
@@ -1929,17 +1929,19 @@ class Game:
             player = self.role_dictionary[i]
             if player.conjuror is True and player.new_role.role != player.role and player.new_role.gamenum != 0:
                 self.role_swap(player, player.new_role)
-            if player.skipped and player in self.to_skip:
-                del self.to_skip[self.to_skip.index(player)]
-        if len(self.to_skip) == 0:
-            if self.day_close_tm < datetime.datetime.now() + datetime.timedelta(minutes=10):
-                self.day_thread.write_message("The remainder of the day has been skipped by unanimous vote.")
-            self.day_close_tm = datetime.datetime.now()
+        for i in self.role_dictionary:
+            player = self.role_dictionary[i]
+            if player.alive and not player.skipped:
+                self.to_skip.append(player)
         if post_skips:
             text = self.day_thread.quote_message(skip_post) + "The following players have yet to skip:\n"
             for unskipped in self.to_skip:
                 text = text + unskipped.screenname + '\n'
             self.day_thread.write_message(text)
+        if len(self.to_skip) == 0:
+            if self.day_close_tm < datetime.datetime.now() + datetime.timedelta(minutes=10):
+                self.day_thread.write_message("The remainder of the day has been skipped by unanimous vote.")
+            self.day_close_tm = datetime.datetime.now()
         if post_skips_private:
             for i, postid in enumerate(skip_private):
                 skip_chats[i].write_message(skip_chats[i].quote_message(postid) + f"There are still {len(self.to_skip)}"
@@ -2477,7 +2479,7 @@ class Game:
         elif method == 'marksman':
             killer.has_killed = True
             self.output_data()
-            return (f"[b]{victim.screenname}[/b] was shot and killed by the marksman. "
+            return (f"[b]{victim.screenname}[/b] was shot and killed by the Marksman. "
                     f"{victim.screenname} was the [b]{victim.apparent_role}[/b].\n\n" + self.secondary_text)
         elif method == 'misfire':
             self.output_data()

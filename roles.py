@@ -2492,7 +2492,7 @@ class Witch(Player):
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only poison one person. "
                                                                            "Check the spelling.")
             elif not self.has_kill_potion:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You are out of rocks.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You have used the kill potion.")
             elif not victims[0].alive:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "Your target is dead.")
             elif victims[0].gamenum == self.gamenum:
@@ -3238,7 +3238,7 @@ class ToxicWolf(Player):
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only poison one person. "
                                                                            "Check the spelling.")
             elif self.mp < 50:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You are out of rocks.")
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You are out of ability uses.")
             elif not victims[0].alive:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "Your target is dead.")
             elif victims[0].poisoned:
