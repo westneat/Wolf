@@ -673,10 +673,10 @@ class Game:
                 'Player Voting': posters,
                 'Voted Player': votes,
                 'Wolf Power': [x.wolf_voting_power * x.wolf_order for x in posters],
-                'Votes': [1 for _ in posters],
+                'Votes': [2 if x.role == 'Alpha Wolf' else 1 for x in posters],
                 'Random': [random.random() for _ in posters]
             })
-        vote_tabulation = vote_table.groupby('Voted Player').sum().reset_index()
+        vote_tabulation = vote_table.groupby('Voted Player', sort=False).sum().reset_index()
         vote_tabulation = vote_tabulation.sort_values(by=['Votes', 'Wolf Power', 'Random'], ascending=False)
         vote_list = vote_tabulation['Voted Player'].tolist()
         return vote_list

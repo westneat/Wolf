@@ -1828,7 +1828,7 @@ class Marksman(Player):
                         f"You will shoot {victims[0].screenname if self.night > 1 else victims[0].noun} tonight.")
                 chat_obj.write_message(text)
             elif len(victims) != 1:
-                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only mark one person. "
+                chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only shoot one person. "
                                                                            "Check the spelling.")
             elif victims[0].gamenum != self.acting_upon[0].gamenum:
                 chat_obj.write_message(chat_obj.quote_message(messageid) + "You can only shoot the person "
